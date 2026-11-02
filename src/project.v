@@ -31,9 +31,9 @@ module tt_um_khatam_v (
 
   wire visible = (hcount < 640) && (vcount < 480);
 
-  // sync pulses
-  wire hsync = (hcount >= 656) && (hcount < 752);
-  wire vsync = (vcount >= 490) && (vcount < 492);
+  // sync pulses, both negative for 640x480
+  wire hsync = ~((hcount >= 656) && (hcount < 752));
+  wire vsync = ~((vcount >= 490) && (vcount < 492));
 
   // khatam star, one per 64x64 cell
   // fold the cell so the middle is at 0,0 and every quarter looks the same
