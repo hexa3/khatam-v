@@ -18,7 +18,7 @@ module tt_um_khatam_v (
     if (!rst_n) begin
       hcount <= 0;
       vcount <= 0;
-    end else if (hcount == 800) begin
+    end else if (hcount == 799) begin
       hcount <= 0;
       if (vcount == 524)
         vcount <= 0;
