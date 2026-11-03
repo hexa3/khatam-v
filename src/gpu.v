@@ -35,8 +35,12 @@ module gpu (
 
   // khatam star, one per 64x64 cell
   // fold the cell so the middle is at 0,0 and every quarter looks the same
-  wire [5:0] px = hcount[5:0];
-  wire [5:0] py = vcount[5:0];
+  // scrolls sideways by 1 pixel every 2 frames
+  wire [9:0] x = hcount + frame[10:1];
+  wire [9:0] y = vcount;
+
+  wire [5:0] px = x[5:0];
+  wire [5:0] py = y[5:0];
   wire [4:0] ax = px[5] ? px[4:0] : ~px[4:0];
   wire [4:0] ay = py[5] ? py[4:0] : ~py[4:0];
   wire [5:0] sum_a = ax + ay;
@@ -75,8 +79,8 @@ module gpu (
   wire pattern = 1'b0;   // 0 = star, 1 = octagons. change it by hand for now
 
   // bands of 2 colours that slide across the cells
-  wire [1:0] cx = hcount[7:6];
-  wire [1:0] cy = vcount[7:6];
+  wire [1:0] cx = x[7:6];
+  wire [1:0] cy = y[7:6];
   wire [1:0] band = cx + cy - frame[6:5];
 
   // colours, RRGGBB
