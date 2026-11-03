@@ -58,12 +58,27 @@ module gpu (
   wire in_inner = ((ax <= r_in) && (ay <= r_in)) || (sum_a <= r_in_diag);
   wire line_star = in_star & ~in_inner;
 
+  // second pattern: octagons. bigger than the star, so the corners get cut off
+  // by the diamond instead of poking out
+  wire [4:0] r_oct = r + 5'd8;
+  wire [5:0] r_oct_diag = r_oct + (r_oct >> 1) - (r_oct >> 3);
+  wire in_oct = (ax <= r_oct) && (ay <= r_oct) && (sum_a <= r_oct_diag);
+  wire [4:0] r_oct_in = r_oct - 5'd3;
+  wire [5:0] r_oct_in_diag = r_oct_in + (r_oct_in >> 1) - (r_oct_in >> 3);
+  wire in_oct_inner = (ax <= r_oct_in) && (ay <= r_oct_in) && (sum_a <= r_oct_in_diag);
+  wire line_oct = in_oct & ~in_oct_inner;
+
+  wire pattern = 1'b0;   // 0 = star, 1 = octagons. change it by hand for now
+
   // bands of 2 colours that slide across the cells
   wire [1:0] cx = hcount[7:6];
   wire [1:0] cy = vcount[7:6];
   wire [1:0] band = cx + cy - frame[6:5];
   wire [5:0] fill = band[1] ? 6'b00_00_10 : 6'b00_01_11;
 
-  assign rgb = !visible ? 6'd0 : line_star ? 6'b00_00_01 : in_star ? fill : 6'b11_11_11;
+  wire line = pattern ? line_oct : line_star;
+  wire in_shape = pattern ? in_oct : in_star;
+
+  assign rgb = !visible ? 6'd0 : line ? 6'b00_00_01 : in_shape ? fill : 6'b11_11_11;
 
 endmodule
