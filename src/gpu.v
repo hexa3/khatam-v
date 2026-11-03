@@ -78,14 +78,43 @@ module gpu (
   wire [1:0] cx = hcount[7:6];
   wire [1:0] cy = vcount[7:6];
   wire [1:0] band = cx + cy - frame[6:5];
-  wire [5:0] fill = band[1] ? 6'b00_00_10 : 6'b00_01_11;
 
-  wire line = pattern ? line_oct : line_star;
-  wire in_shape = pattern ? in_oct : in_star;
+  // colours, RRGGBB
+  localparam C_BG    = 6'b11_11_11;
+  localparam C_FILL  = 6'b00_01_11;
+  localparam C_FILL2 = 6'b00_00_10;
+  localparam C_LINE  = 6'b00_00_01;
+  localparam C_ACCENT = 6'b00_10_01;
 
-  wire accent = pattern ? small_star : rosette;
+  localparam BG = 3'd0, FILL = 3'd1, LINE = 3'd3, ACCENT = 3'd4;
 
-  wire [5:0] color = line ? 6'b00_00_01 : accent ? 6'b00_10_01 : in_shape ? fill : 6'b11_11_11;
+  reg [2:0] kind;
+  always @(*) begin
+    case (pattern)
+      1'd0: begin
+        if (line_star)    kind = LINE;
+        else if (rosette) kind = ACCENT;
+        else if (in_star) kind = FILL;
+        else              kind = BG;
+      end
+      default: begin
+        if (line_oct)        kind = LINE;
+        else if (small_star) kind = ACCENT;
+        else if (in_oct)     kind = FILL;
+        else                 kind = BG;
+      end
+    endcase
+  end
+
+  reg [5:0] color;
+  always @(*) begin
+    case (kind)
+      FILL:    color = band[1] ? C_FILL2 : C_FILL;
+      LINE:    color = C_LINE;
+      ACCENT:  color = C_ACCENT;
+      default: color = C_BG;
+    endcase
+  end
 
   // registered outputs so nothing glitches
   always @(posedge clk) begin
