@@ -68,6 +68,12 @@ module gpu (
   wire in_oct_inner = (ax <= r_oct_in) && (ay <= r_oct_in) && (sum_a <= r_oct_in_diag);
   wire line_oct = in_oct & ~in_oct_inner;
 
+  // little shape in the middle of each one, other kind than the big one
+  wire [4:0] r_small = (r >> 2) + 5'd3;
+  wire [5:0] r_small_diag = r_small + (r_small >> 1) - (r_small >> 3);
+  wire rosette = (ax <= r_small) && (ay <= r_small) && (sum_a <= r_small_diag);
+  wire small_star = ((ax <= r_small) && (ay <= r_small)) || (sum_a <= r_small_diag);
+
   wire pattern = 1'b0;   // 0 = star, 1 = octagons. change it by hand for now
 
   // bands of 2 colours that slide across the cells
@@ -79,6 +85,8 @@ module gpu (
   wire line = pattern ? line_oct : line_star;
   wire in_shape = pattern ? in_oct : in_star;
 
-  assign rgb = !visible ? 6'd0 : line ? 6'b00_00_01 : in_shape ? fill : 6'b11_11_11;
+  wire accent = pattern ? small_star : rosette;
+
+  assign rgb = !visible ? 6'd0 : line ? 6'b00_00_01 : accent ? 6'b00_10_01 : in_shape ? fill : 6'b11_11_11;
 
 endmodule
