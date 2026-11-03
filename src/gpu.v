@@ -58,6 +58,12 @@ module gpu (
   wire in_inner = ((ax <= r_in) && (ay <= r_in)) || (sum_a <= r_in_diag);
   wire line_star = in_star & ~in_inner;
 
-  assign rgb = !visible ? 6'd0 : line_star ? 6'b00_00_01 : in_star ? 6'b00_01_11 : 6'b11_11_11;
+  // bands of 2 colours that slide across the cells
+  wire [1:0] cx = hcount[7:6];
+  wire [1:0] cy = vcount[7:6];
+  wire [1:0] band = cx + cy - frame[6:5];
+  wire [5:0] fill = band[1] ? 6'b00_00_10 : 6'b00_01_11;
+
+  assign rgb = !visible ? 6'd0 : line_star ? 6'b00_00_01 : in_star ? fill : 6'b11_11_11;
 
 endmodule
