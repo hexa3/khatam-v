@@ -43,6 +43,10 @@ module gpu (
   // 28 = 20 * 1.375, close enough to sqrt(2) so the points look even
   wire in_star = ((ax <= 5'd20) && (ay <= 5'd20)) || (sum_a <= 6'd28);
 
-  assign rgb = !visible ? 6'd0 : in_star ? 6'b00_01_11 : 6'b11_11_11;
+  // outline = the star minus a smaller star (3 less)
+  wire in_inner = ((ax <= 5'd17) && (ay <= 5'd17)) || (sum_a <= 6'd24);
+  wire line_star = in_star & ~in_inner;
+
+  assign rgb = !visible ? 6'd0 : line_star ? 6'b00_00_01 : in_star ? 6'b00_01_11 : 6'b11_11_11;
 
 endmodule
