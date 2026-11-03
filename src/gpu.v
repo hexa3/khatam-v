@@ -3,9 +3,9 @@
 module gpu (
     input  wire       clk,
     input  wire       rst_n,
-    output wire [5:0] rgb,
-    output wire       hsync,
-    output wire       vsync
+    output reg  [5:0] rgb,
+    output reg        hsync,
+    output reg        vsync
 );
 
   // vga timing, moved here from project.v
@@ -32,8 +32,6 @@ module gpu (
 
   wire visible = (hcount < 640) && (vcount < 480);
 
-  assign hsync = ~((hcount >= 656) && (hcount < 752));
-  assign vsync = ~((vcount >= 490) && (vcount < 492));
 
   // khatam star, one per 64x64 cell
   // fold the cell so the middle is at 0,0 and every quarter looks the same
@@ -87,6 +85,19 @@ module gpu (
 
   wire accent = pattern ? small_star : rosette;
 
-  assign rgb = !visible ? 6'd0 : line ? 6'b00_00_01 : accent ? 6'b00_10_01 : in_shape ? fill : 6'b11_11_11;
+  wire [5:0] color = line ? 6'b00_00_01 : accent ? 6'b00_10_01 : in_shape ? fill : 6'b11_11_11;
+
+  // registered outputs so nothing glitches
+  always @(posedge clk) begin
+    if (!rst_n) begin
+      rgb   <= 0;
+      hsync <= 1;
+      vsync <= 1;
+    end else begin
+      rgb   <= visible ? color : 6'd0;
+      hsync <= ~((hcount >= 656) && (hcount < 752));
+      vsync <= ~((vcount >= 490) && (vcount < 492));
+    end
+  end
 
 endmodule
