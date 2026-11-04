@@ -95,6 +95,10 @@ module gpu (
   wire in_oct      = octogon(ax, ay, sum_a, ro);
   wire line_oct    = in_oct & ~octogon(ax, ay, sum_a, ro3);
   wire small_star  = star(ax, ay, sum_a, rs);
+  wire [5:0] dd = r + 5'd9;
+  wire in_dia   = (sum_a <= dd);
+  wire line_dia = in_dia && (sum_a > dd - 6'd3);
+
   wire in_starb    = star(bx_, by_, sum_b, rb);
   wire line_starb  = in_starb & ~star(bx_, by_, sum_b, rb3);
 
@@ -130,13 +134,19 @@ module gpu (
         else if (in_oct)     kind = FILL;
         else                 kind = BG;
       end
-      default: begin
+      2'd2: begin
         // the two stars cross over each other
         if (line_star && line_starb)  kind = (px[5] ^ py[5]) ? LINE : ACCENT;
         else if (line_star)           kind = LINE;
         else if (line_starb)          kind = ACCENT;
         else if (in_star && in_starb) kind = FILL;
         else if (in_star || in_starb) kind = FILL;
+        else                          kind = BG;
+      end
+      default: begin
+        if (line_dia)                 kind = LINE;
+        else if (sum_a <= {1'b0, rs}) kind = ACCENT;
+        else if (in_dia)              kind = FILL;
         else                          kind = BG;
       end
     endcase
