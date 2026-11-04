@@ -3,6 +3,7 @@
 module gpu (
     input  wire       clk,
     input  wire       rst_n,
+    input  wire [5:0] sw,
     output reg  [5:0] rgb,
     output reg        hsync,
     output reg        vsync
@@ -88,7 +89,8 @@ module gpu (
   wire line_oct    = in_oct & ~octogon(ax, ay, sum_a, ro3);
   wire small_star  = star(ax, ay, sum_a, rs);
 
-  wire pattern = 1'b0;   // 0 = star, 1 = octagons. change it by hand for now
+  // no cpu yet so the switches pick the pattern
+  wire [1:0] pattern = sw[1:0];
 
   // bands of 2 colours that slide across the cells
   wire [1:0] cx = x[7:6];
@@ -107,7 +109,7 @@ module gpu (
   reg [2:0] kind;
   always @(*) begin
     case (pattern)
-      1'd0: begin
+      2'd0: begin
         if (line_star)    kind = LINE;
         else if (rosette) kind = ACCENT;
         else if (in_star) kind = FILL;
