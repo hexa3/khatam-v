@@ -40,8 +40,25 @@ module gpu (
   wire [9:0] x = hcount + frame[10:1];
   wire [9:0] y = vcount;
 
-  wire [5:0] px = x[5:0];
-  wire [5:0] py = y[5:0];
+  // sw[3:2] = cell size: 64 (0), 32 (1) or 128 (2) pixels
+  reg [5:0] px, py;
+  reg [1:0] cx, cy;
+  always @(*) begin
+    case (sw[3:2])
+      2'd1: begin
+        px = {x[4:0], 1'b0}; py = {y[4:0], 1'b0};
+        cx = x[6:5];         cy = y[6:5];
+      end
+      2'd2: begin
+        px = x[6:1];         py = y[6:1];
+        cx = x[8:7];         cy = y[8:7];
+      end
+      default: begin
+        px = x[5:0];         py = y[5:0];
+        cx = x[7:6];         cy = y[7:6];
+      end
+    endcase
+  end
   wire [4:0] ax = px[5] ? px[4:0] : ~px[4:0];
   wire [4:0] ay = py[5] ? py[4:0] : ~py[4:0];
   wire [5:0] sum_a = ax + ay;
@@ -106,8 +123,6 @@ module gpu (
   wire [1:0] pattern = sw[1:0];
 
   // bands of 2 colours that slide across the cells
-  wire [1:0] cx = x[7:6];
-  wire [1:0] cy = y[7:6];
   wire [1:0] band = cx + cy - frame[6:5];
 
   // colours, RRGGBB
