@@ -116,6 +116,8 @@ module gpu (
   wire in_dia   = (sum_a <= dd);
   wire line_dia = in_dia && (sum_a > dd - 6'd3);
 
+  wire [5:0] ripple = sum_a + frame[6:3];   // makes the diamonds shimmer
+
   wire in_starb    = star(bx_, by_, sum_b, rb);
   wire line_starb  = in_starb & ~star(bx_, by_, sum_b, rb3);
 
@@ -132,7 +134,7 @@ module gpu (
   localparam C_LINE  = 6'b00_00_01;
   localparam C_ACCENT = 6'b00_10_01;
 
-  localparam BG = 3'd0, FILL = 3'd1, LINE = 3'd3, ACCENT = 3'd4;
+  localparam BG = 3'd0, FILL = 3'd1, FILL2 = 3'd2, LINE = 3'd3, ACCENT = 3'd4;
 
   reg [2:0] kind;
   always @(*) begin
@@ -154,14 +156,14 @@ module gpu (
         if (line_star && line_starb)  kind = (px[5] ^ py[5]) ? LINE : ACCENT;
         else if (line_star)           kind = LINE;
         else if (line_starb)          kind = ACCENT;
-        else if (in_star && in_starb) kind = FILL;
+        else if (in_star && in_starb) kind = FILL2;
         else if (in_star || in_starb) kind = FILL;
         else                          kind = BG;
       end
       default: begin
         if (line_dia)                 kind = LINE;
         else if (sum_a <= {1'b0, rs}) kind = ACCENT;
-        else if (in_dia)              kind = FILL;
+        else if (in_dia)              kind = ripple[2] ? FILL : FILL2;
         else                          kind = BG;
       end
     endcase
@@ -172,6 +174,7 @@ module gpu (
     if (!sw[5]) color = C_BG;
     else case (kind)
       FILL:    color = band[1] ? C_FILL2 : C_FILL;
+      FILL2:   color = band[1] ? C_FILL : C_FILL2;
       LINE:    color = C_LINE;
       ACCENT:  color = C_ACCENT;
       default: color = C_BG;
