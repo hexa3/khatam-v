@@ -82,12 +82,21 @@ module gpu (
   wire [4:0] ro  = r + 5'd8;
   wire [4:0] ro3 = ro - 5'd3;
 
+  // second star, flipped inside out and shifted by half a cell
+  wire [4:0] bx_ = ~ax;
+  wire [4:0] by_ = ~ay;
+  wire [5:0] sum_b = bx_ + by_;
+  wire [4:0] rb  = r - 5'd6;
+  wire [4:0] rb3 = rb - 5'd3;
+
   wire in_star     = star(ax, ay, sum_a, r);
   wire line_star   = in_star & ~star(ax, ay, sum_a, r3);
   wire rosette     = octogon(ax, ay, sum_a, rs);
   wire in_oct      = octogon(ax, ay, sum_a, ro);
   wire line_oct    = in_oct & ~octogon(ax, ay, sum_a, ro3);
   wire small_star  = star(ax, ay, sum_a, rs);
+  wire in_starb    = star(bx_, by_, sum_b, rb);
+  wire line_starb  = in_starb & ~star(bx_, by_, sum_b, rb3);
 
   // no cpu yet so the switches pick the pattern
   wire [1:0] pattern = sw[1:0];
@@ -115,11 +124,20 @@ module gpu (
         else if (in_star) kind = FILL;
         else              kind = BG;
       end
-      default: begin
+      2'd1: begin
         if (line_oct)        kind = LINE;
         else if (small_star) kind = ACCENT;
         else if (in_oct)     kind = FILL;
         else                 kind = BG;
+      end
+      default: begin
+        // the two stars cross over each other
+        if (line_star && line_starb)  kind = (px[5] ^ py[5]) ? LINE : ACCENT;
+        else if (line_star)           kind = LINE;
+        else if (line_starb)          kind = ACCENT;
+        else if (in_star && in_starb) kind = FILL;
+        else if (in_star || in_starb) kind = FILL;
+        else                          kind = BG;
       end
     endcase
   end
