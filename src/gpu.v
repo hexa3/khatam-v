@@ -63,9 +63,9 @@ module gpu (
   wire [4:0] ay = py[5] ? py[4:0] : ~py[4:0];
   wire [5:0] sum_a = ax + ay;
 
-  // radius goes up and down, 16 .. 23 (frame counts up then down)
+  // radius goes up and down, 16 .. 23 (frame counts up then down). sw[4] off = stays at 20
   wire [6:0] tri_wave = frame[7] ? ~frame[6:0] : frame[6:0];
-  wire [4:0] r = 5'd16 + tri_wave[6:4];
+  wire [4:0] r = sw[4] ? (5'd16 + tri_wave[6:4]) : 5'd20;
 
   function [5:0] diag;  // 1.375 * rr
     input [4:0] rr;
