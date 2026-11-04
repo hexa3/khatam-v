@@ -85,12 +85,12 @@ module gpu (
   endfunction
 
   // octagon = the square AND the diamond, so the corners are cut off
-  function octogon;
+  function octagon;
     input [4:0] a, b;
     input [5:0] s;
     input [4:0] rr;
     begin
-      octogon = (a <= rr) && (b <= rr) && (s <= diag(rr));
+      octagon = (a <= rr) && (b <= rr) && (s <= diag(rr));
     end
   endfunction
 
@@ -108,9 +108,9 @@ module gpu (
 
   wire in_star     = star(ax, ay, sum_a, r);
   wire line_star   = in_star & ~star(ax, ay, sum_a, r3);
-  wire rosette     = octogon(ax, ay, sum_a, rs);
-  wire in_oct      = octogon(ax, ay, sum_a, ro);
-  wire line_oct    = in_oct & ~octogon(ax, ay, sum_a, ro3);
+  wire rosette     = octagon(ax, ay, sum_a, rs);
+  wire in_oct      = octagon(ax, ay, sum_a, ro);
+  wire line_oct    = in_oct & ~octagon(ax, ay, sum_a, ro3);
   wire small_star  = star(ax, ay, sum_a, rs);
   wire [5:0] dd = r + 5'd9;
   wire in_dia   = (sum_a <= dd);
