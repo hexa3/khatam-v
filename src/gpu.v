@@ -124,8 +124,6 @@ module gpu (
   // no cpu yet so the switches pick the pattern
   wire [1:0] pattern = sw[1:0];
 
-  // bands of 2 colours that slide across the cells
-  wire [1:0] band = cx + cy - frame[6:5];
 
   // colours, RRGGBB
   localparam C_BG    = 6'b11_11_11;
@@ -137,7 +135,9 @@ module gpu (
   localparam BG = 3'd0, FILL = 3'd1, FILL2 = 3'd2, LINE = 3'd3, ACCENT = 3'd4;
 
   reg [2:0] kind;
+  reg       on_b;
   always @(*) begin
+    on_b = 0;
     case (pattern)
       2'd0: begin
         if (line_star)    kind = LINE;
@@ -157,7 +157,8 @@ module gpu (
         else if (line_star)           kind = LINE;
         else if (line_starb)          kind = ACCENT;
         else if (in_star && in_starb) kind = FILL2;
-        else if (in_star || in_starb) kind = FILL;
+        else if (in_star)             kind = FILL;
+        else if (in_starb) begin      kind = FILL; on_b = 1; end
         else                          kind = BG;
       end
       default: begin
@@ -168,6 +169,11 @@ module gpu (
       end
     endcase
   end
+
+  // bands of 2 colours that slide across the cells
+  wire [1:0] cx2  = on_b ? cx + px[5] : cx;
+  wire [1:0] cy2  = on_b ? cy + py[5] : cy;
+  wire [1:0] band = cx2 + cy2 - frame[6:5];
 
   reg [5:0] color;
   always @(*) begin
