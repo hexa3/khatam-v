@@ -169,7 +169,8 @@ module gpu (
 
   reg [5:0] color;
   always @(*) begin
-    case (kind)
+    if (!sw[5]) color = C_BG;
+    else case (kind)
       FILL:    color = band[1] ? C_FILL2 : C_FILL;
       LINE:    color = C_LINE;
       ACCENT:  color = C_ACCENT;
