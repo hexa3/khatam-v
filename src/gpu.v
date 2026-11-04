@@ -49,32 +49,44 @@ module gpu (
   wire [6:0] tri_wave = frame[7] ? ~frame[6:0] : frame[6:0];
   wire [4:0] r = 5'd16 + tri_wave[6:4];
 
+  function [5:0] diag;  // 1.375 * rr
+    input [4:0] rr;
+    begin
+      diag = rr + (rr >> 1) - (rr >> 3);
+    end
+  endfunction
+
   // 8 point star = a square OR a diamond (the square turned 45 degrees)
-  // diamond size = r * 1.375, close enough to sqrt(2) so the points look even
-  wire [5:0] r_diag = r + (r >> 1) - (r >> 3);
-  wire in_star = ((ax <= r) && (ay <= r)) || (sum_a <= r_diag);
+  function star;
+    input [4:0] a, b;
+    input [5:0] s;
+    input [4:0] rr;
+    begin
+      star = ((a <= rr) && (b <= rr)) || (s <= diag(rr));
+    end
+  endfunction
 
-  // outline = the star minus a smaller star (3 less)
-  wire [4:0] r_in = r - 5'd3;
-  wire [5:0] r_in_diag = r_in + (r_in >> 1) - (r_in >> 3);
-  wire in_inner = ((ax <= r_in) && (ay <= r_in)) || (sum_a <= r_in_diag);
-  wire line_star = in_star & ~in_inner;
+  // octagon = the square AND the diamond, so the corners are cut off
+  function octogon;
+    input [4:0] a, b;
+    input [5:0] s;
+    input [4:0] rr;
+    begin
+      octogon = (a <= rr) && (b <= rr) && (s <= diag(rr));
+    end
+  endfunction
 
-  // second pattern: octagons. bigger than the star, so the corners get cut off
-  // by the diamond instead of poking out
-  wire [4:0] r_oct = r + 5'd8;
-  wire [5:0] r_oct_diag = r_oct + (r_oct >> 1) - (r_oct >> 3);
-  wire in_oct = (ax <= r_oct) && (ay <= r_oct) && (sum_a <= r_oct_diag);
-  wire [4:0] r_oct_in = r_oct - 5'd3;
-  wire [5:0] r_oct_in_diag = r_oct_in + (r_oct_in >> 1) - (r_oct_in >> 3);
-  wire in_oct_inner = (ax <= r_oct_in) && (ay <= r_oct_in) && (sum_a <= r_oct_in_diag);
-  wire line_oct = in_oct & ~in_oct_inner;
+  wire [4:0] r3  = r - 5'd3;
+  wire [4:0] rs  = (r >> 2) + 5'd3;
+  wire [4:0] ro  = r + 5'd8;
+  wire [4:0] ro3 = ro - 5'd3;
 
-  // little shape in the middle of each one, other kind than the big one
-  wire [4:0] r_small = (r >> 2) + 5'd3;
-  wire [5:0] r_small_diag = r_small + (r_small >> 1) - (r_small >> 3);
-  wire rosette = (ax <= r_small) && (ay <= r_small) && (sum_a <= r_small_diag);
-  wire small_star = ((ax <= r_small) && (ay <= r_small)) || (sum_a <= r_small_diag);
+  wire in_star     = star(ax, ay, sum_a, r);
+  wire line_star   = in_star & ~star(ax, ay, sum_a, r3);
+  wire rosette     = octogon(ax, ay, sum_a, rs);
+  wire in_oct      = octogon(ax, ay, sum_a, ro);
+  wire line_oct    = in_oct & ~octogon(ax, ay, sum_a, ro3);
+  wire small_star  = star(ax, ay, sum_a, rs);
 
   wire pattern = 1'b0;   // 0 = star, 1 = octagons. change it by hand for now
 
