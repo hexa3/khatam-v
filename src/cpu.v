@@ -33,11 +33,29 @@ module cpu (
   localparam OP_JAL   = 7'b1101111;
   localparam OP_JALR  = 7'b1100111;
   localparam OP_IMM   = 7'b0010011;
+  localparam OP_REG   = 7'b0110011;
 
   assign mem_addr = pc;
   assign mem_req  = (state == FETCH);
 
   wire [31:0] a = regs[rs1];
+  wire [31:0] b = (opcode == OP_REG) ? regs[rs2] : imm_i;
+
+  // alu, one thing for each instruction
+  wire [4:0] shamt = b[4:0];
+  reg  [31:0] alu;
+  always @(*) begin
+    case (f3)
+      3'b000:  alu = (opcode == OP_REG && ir[30]) ? a - b : a + b;
+      3'b001:  alu = a << shamt;
+      3'b010:  alu = ($signed(a) < $signed(b)) ? 1 : 0;
+      3'b011:  alu = (a < b) ? 1 : 0;
+      3'b100:  alu = a ^ b;
+      3'b101:  alu = ir[30] ? ($signed(a) >>> shamt) : (a >> shamt);
+      3'b110:  alu = a | b;
+      default: alu = a & b;
+    endcase
+  end
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -65,7 +83,7 @@ module cpu (
               regs[rd] <= pc + 4;
               pc       <= a + imm_i;
             end
-            OP_IMM:   regs[rd] <= a + imm_i;   // only addi so far
+            OP_IMM, OP_REG: regs[rd] <= alu;
           endcase
         end
       endcase
