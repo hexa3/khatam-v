@@ -6,6 +6,7 @@ module cpu (
     input  wire        rst_n,
     output wire [31:0] mem_addr,
     output wire [31:0] mem_wdata,
+    output wire [2:0]  mem_size,   // 1, 2 or 4 bytes
     output wire        mem_we,
     output wire        mem_req,
     input  wire [31:0] mem_rdata,
@@ -46,12 +47,22 @@ module cpu (
   wire [31:0] a = regs[rs1];
   wire [31:0] b = (opcode == OP_REG || opcode == OP_BRANCH) ? regs[rs2] : imm_i;
 
-  // loads and stores, just words for now
+  // loads and stores
   wire [31:0] addr = a + ((opcode == OP_STORE) ? imm_s : imm_i);
   assign mem_addr  = (state == MEM) ? addr : pc;
   assign mem_req   = (state == FETCH) || (state == MEM);
+  assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
   assign mem_we    = (state == MEM) && (opcode == OP_STORE);
   assign mem_wdata = regs[rs2];
+
+  reg [31:0] load_val;
+  always @(*) begin
+    case (f3)
+      3'b000, 3'b100: load_val = {24'd0, mem_rdata[7:0]};
+      3'b001, 3'b101: load_val = {16'd0, mem_rdata[15:0]};
+      default:        load_val = mem_rdata;
+    endcase
+  end
 
   // alu, one thing for each instruction
   wire [4:0] shamt = b[4:0];
@@ -120,7 +131,7 @@ module cpu (
 
         MEM: if (mem_done) begin
           if (opcode == OP_LOAD)
-            regs[rd] <= mem_rdata;
+            regs[rd] <= load_val;
           pc    <= pc + 4;
           state <= FETCH;
         end
