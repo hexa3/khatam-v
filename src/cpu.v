@@ -1,4 +1,4 @@
-// risc-v cpu, first try. just rv32i for now
+// risc-v cpu, first try. rv32e: only 16 registers, the chip is tiny
 `default_nettype none
 
 module cpu (
@@ -20,13 +20,13 @@ module cpu (
   reg [1:0]  state;
   reg [31:0] pc;
   reg [31:0] ir;
-  reg [31:0] regs [0:31];
+  reg [31:0] regs [1:15];   // x0 is always 0 so it doesnt need a register
 
   wire [6:0] opcode = ir[6:0];
-  wire [4:0] rd     = ir[11:7];
+  wire [3:0] rd     = ir[10:7];
   wire [2:0] f3     = ir[14:12];
-  wire [4:0] rs1    = ir[19:15];
-  wire [4:0] rs2    = ir[24:20];
+  wire [3:0] rs1    = ir[18:15];
+  wire [3:0] rs2    = ir[23:20];
 
   wire [31:0] imm_i = {{20{ir[31]}}, ir[31:20]};
   wire [31:0] imm_b = {{20{ir[31]}}, ir[7], ir[30:25], ir[11:8], 1'b0};
@@ -44,8 +44,9 @@ module cpu (
   localparam OP_IMM   = 7'b0010011;
   localparam OP_REG   = 7'b0110011;
 
-  wire [31:0] a = regs[rs1];
-  wire [31:0] b = (opcode == OP_REG || opcode == OP_BRANCH) ? regs[rs2] : imm_i;
+  wire [31:0] a    = (rs1 == 0) ? 32'd0 : regs[rs1];
+  wire [31:0] rv2  = (rs2 == 0) ? 32'd0 : regs[rs2];
+  wire [31:0] b = (opcode == OP_REG || opcode == OP_BRANCH) ? rv2 : imm_i;
 
   // loads and stores
   wire [31:0] addr = a + ((opcode == OP_STORE) ? imm_s : imm_i);
@@ -53,7 +54,7 @@ module cpu (
   assign mem_req   = (state == FETCH) || (state == MEM);
   assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
   assign mem_we    = (state == MEM) && (opcode == OP_STORE);
-  assign mem_wdata = regs[rs2];
+  assign mem_wdata = rv2;
 
   reg [31:0] load_val;
   always @(*) begin
