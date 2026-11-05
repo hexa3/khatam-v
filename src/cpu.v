@@ -5,15 +5,18 @@ module cpu (
     input  wire        clk,
     input  wire        rst_n,
     output wire [31:0] mem_addr,
+    output wire [31:0] mem_wdata,
+    output wire        mem_we,
     output wire        mem_req,
     input  wire [31:0] mem_rdata,
     input  wire        mem_done
 );
 
-  localparam FETCH = 1'd0;
-  localparam EXEC  = 1'd1;
+  localparam FETCH = 2'd0;
+  localparam EXEC  = 2'd1;
+  localparam MEM   = 2'd2;
 
-  reg        state;
+  reg [1:0]  state;
   reg [31:0] pc;
   reg [31:0] ir;
   reg [31:0] regs [0:31];
@@ -26,6 +29,7 @@ module cpu (
 
   wire [31:0] imm_i = {{20{ir[31]}}, ir[31:20]};
   wire [31:0] imm_b = {{20{ir[31]}}, ir[30:25], ir[11:8], ir[7], 1'b0};
+  wire [31:0] imm_s = {{20{ir[31]}}, ir[31:25], ir[11:7]};
   wire [31:0] imm_u = {ir[31:12], 12'd0};
   wire [31:0] imm_j = {{12{ir[31]}}, ir[19:12], ir[20], ir[30:21], 1'b0};
 
@@ -34,14 +38,20 @@ module cpu (
   localparam OP_JAL   = 7'b1101111;
   localparam OP_JALR  = 7'b1100111;
   localparam OP_BRANCH = 7'b1100011;
+  localparam OP_LOAD  = 7'b0000011;
+  localparam OP_STORE = 7'b0100011;
   localparam OP_IMM   = 7'b0010011;
   localparam OP_REG   = 7'b0110011;
 
-  assign mem_addr = pc;
-  assign mem_req  = (state == FETCH);
-
   wire [31:0] a = regs[rs1];
   wire [31:0] b = (opcode == OP_REG || opcode == OP_BRANCH) ? regs[rs2] : imm_i;
+
+  // loads and stores, just words for now
+  wire [31:0] addr = a + ((opcode == OP_STORE) ? imm_s : imm_i);
+  assign mem_addr  = (state == MEM) ? addr : pc;
+  assign mem_req   = (state == FETCH) || (state == MEM);
+  assign mem_we    = (state == MEM) && (opcode == OP_STORE);
+  assign mem_wdata = regs[rs2];
 
   // alu, one thing for each instruction
   wire [4:0] shamt = b[4:0];
@@ -88,6 +98,10 @@ module cpu (
           state <= FETCH;
 
           case (opcode)
+            OP_LOAD, OP_STORE: begin
+              pc    <= pc;
+              state <= MEM;
+            end
             OP_LUI:   regs[rd] <= imm_u;
             OP_AUIPC: regs[rd] <= pc + imm_u;
             OP_JAL: begin
@@ -101,6 +115,13 @@ module cpu (
             OP_BRANCH: if (take) pc <= pc + imm_b;
             OP_IMM, OP_REG: regs[rd] <= alu;
           endcase
+        end
+
+        MEM: if (mem_done) begin
+          if (opcode == OP_LOAD)
+            regs[rd] <= mem_rdata;
+          pc    <= pc + 4;
+          state <= FETCH;
         end
       endcase
     end
