@@ -25,6 +25,14 @@ module cpu (
   wire [4:0] rs2    = ir[24:20];
 
   wire [31:0] imm_i = {{20{ir[31]}}, ir[31:20]};
+  wire [31:0] imm_u = {ir[31:12], 12'd0};
+  wire [31:0] imm_j = {{12{ir[31]}}, ir[19:12], ir[20], ir[30:21], 1'b0};
+
+  localparam OP_LUI   = 7'b0110111;
+  localparam OP_AUIPC = 7'b0010111;
+  localparam OP_JAL   = 7'b1101111;
+  localparam OP_JALR  = 7'b1100111;
+  localparam OP_IMM   = 7'b0010011;
 
   assign mem_addr = pc;
   assign mem_req  = (state == FETCH);
@@ -43,11 +51,22 @@ module cpu (
         end
 
         EXEC: begin
-          // only addi so far
-          if (opcode == 7'b0010011)
-            regs[rd] <= a + imm_i;
           pc    <= pc + 4;
           state <= FETCH;
+
+          case (opcode)
+            OP_LUI:   regs[rd] <= imm_u;
+            OP_AUIPC: regs[rd] <= pc + imm_u;
+            OP_JAL: begin
+              regs[rd] <= pc + 4;
+              pc       <= pc + imm_j;
+            end
+            OP_JALR: begin
+              regs[rd] <= pc + 4;
+              pc       <= a + imm_i;
+            end
+            OP_IMM:   regs[rd] <= a + imm_i;   // only addi so far
+          endcase
         end
       endcase
     end
