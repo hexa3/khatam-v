@@ -94,6 +94,7 @@ module cpu (
         end
 
         EXEC: begin
+          $display("pc=%h ir=%h a=%h b=%h", pc, ir, a, b);
           pc    <= pc + 4;
           state <= FETCH;
 
