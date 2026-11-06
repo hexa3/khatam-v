@@ -10,6 +10,7 @@ module qspi (
     input  wire        ram,       // 0 = flash, 1 = psram
     input  wire [23:0] addr,
     input  wire [31:0] wdata,
+    input  wire [2:0]  size,      // bytes
     output wire [31:0] rdata,
     output reg         done,
 
@@ -29,8 +30,10 @@ module qspi (
   reg [31:0] rx;
   reg [5:0]  bits;
   reg        phase;     // 0 = about to raise sck, 1 = about to drop it
+  reg [2:0]  nbytes;
 
-  assign rdata = rx;
+  assign rdata = (nbytes == 3'd1) ? {24'd0, rx[7:0]} :
+                 (nbytes == 3'd2) ? {16'd0, rx[15:0]} : rx;
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -44,6 +47,7 @@ module qspi (
       case (state)
         IDLE: begin
           if (req && !done) begin
+            nbytes <= size;
             if (ram) cs_ram   <= 0;
             else     cs_flash <= 0;
             tx    <= {(we ? 8'h02 : 8'h03), addr};   // 0x03 = read, 0x02 = write
@@ -69,9 +73,9 @@ module qspi (
             if (bits == 1) begin
               if (state == CMD) begin
                 state <= DATA;
-                bits  <= 6'd32;
-                tx    <= wdata;
-                mosi  <= wdata[31];
+                bits  <= {nbytes, 3'b000};
+                tx    <= wdata << {(3'd4 - nbytes), 3'b000};   // first byte on top
+                mosi  <= wdata[31 - 8 * (4 - nbytes)];
               end else begin
                 done     <= 1;
                 state    <= IDLE;
