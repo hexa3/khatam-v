@@ -38,9 +38,12 @@ module qspi (
   always @(posedge clk) begin
     if (!rst_n) begin
       state    <= IDLE;
+      sck      <= 0;
+      mosi     <= 0;
       cs_flash <= 1;
       cs_ram   <= 1;
       done     <= 0;
+      phase    <= 0;
     end else begin
       done <= 0;
 
