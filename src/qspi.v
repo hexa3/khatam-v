@@ -6,8 +6,10 @@ module qspi (
     input  wire        rst_n,
 
     input  wire        req,
+    input  wire        we,
     input  wire        ram,       // 0 = flash, 1 = psram
     input  wire [23:0] addr,
+    input  wire [31:0] wdata,
     output wire [31:0] rdata,
     output reg         done,
 
@@ -44,7 +46,7 @@ module qspi (
           if (req && !done) begin
             if (ram) cs_ram   <= 0;
             else     cs_flash <= 0;
-            tx    <= {8'h03, addr};   // 0x03 = read
+            tx    <= {(we ? 8'h02 : 8'h03), addr};   // 0x03 = read, 0x02 = write
             mosi  <= 0;
             bits  <= 6'd32;
             phase <= 0;
@@ -68,6 +70,8 @@ module qspi (
               if (state == CMD) begin
                 state <= DATA;
                 bits  <= 6'd32;
+                tx    <= wdata;
+                mosi  <= wdata[31];
               end else begin
                 done     <= 1;
                 state    <= IDLE;
