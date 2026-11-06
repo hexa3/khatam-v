@@ -6,6 +6,7 @@ module qspi (
     input  wire        rst_n,
 
     input  wire        req,
+    input  wire        ram,       // 0 = flash, 1 = psram
     input  wire [23:0] addr,
     output wire [31:0] rdata,
     output reg         done,
@@ -13,7 +14,8 @@ module qspi (
     output reg         sck,
     output reg         mosi,
     input  wire        miso,
-    output reg         cs_flash   // active low
+    output reg         cs_flash,  // active low
+    output reg         cs_ram     // active low
 );
 
   localparam IDLE = 2'd0;
@@ -32,6 +34,7 @@ module qspi (
     if (!rst_n) begin
       state    <= IDLE;
       cs_flash <= 1;
+      cs_ram   <= 1;
       done     <= 0;
     end else begin
       done <= 0;
@@ -39,7 +42,8 @@ module qspi (
       case (state)
         IDLE: begin
           if (req && !done) begin
-            cs_flash <= 0;
+            if (ram) cs_ram   <= 0;
+            else     cs_flash <= 0;
             tx    <= {8'h03, addr};   // 0x03 = read
             mosi  <= 0;
             bits  <= 6'd32;
@@ -68,6 +72,7 @@ module qspi (
                 done     <= 1;
                 state    <= IDLE;
                 cs_flash <= 1;
+                cs_ram   <= 1;
               end
             end
           end
