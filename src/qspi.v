@@ -1,4 +1,14 @@
-// spi flash reader. plain 1 bit spi, mode 0
+/*
+ * spi controller for the tiny tapeout qspi pmod
+ *   flash (W25Q128) on cs_flash : code + constants
+ *   psram (APS6404) on cs_ram   : ram
+ *
+ * only 1 bit spi for now (mode 0, sck = clk / 2). both chips understand
+ *   0x03 <24 bit addr> <data...>   read
+ *   0x02 <24 bit addr> <data...>   write
+ * so it's the same state machine for both
+ */
+
 `default_nettype none
 
 module qspi (
