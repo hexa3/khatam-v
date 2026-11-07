@@ -47,6 +47,7 @@ module gpu (
   reg [1:0]  cellsize;
   reg        breathe;
   reg        pattern_on;
+  reg [5:0]  pal0, pal1, pal2, pal3, pal4;
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -54,6 +55,12 @@ module gpu (
       cellsize   <= 0;
       breathe    <= 1;
       pattern_on <= 1;
+      // boot up in the Fez colours so you see something straight away
+      pal0 <= 6'b11_11_11;
+      pal1 <= 6'b00_01_11;
+      pal2 <= 6'b00_00_10;
+      pal3 <= 6'b00_00_01;
+      pal4 <= 6'b00_10_01;
     end else if (wr) begin
       case (waddr)
         8'h00: begin
@@ -62,6 +69,11 @@ module gpu (
           breathe    <= wdata[4];
           pattern_on <= wdata[5];
         end
+        8'h10: pal0 <= wdata[5:0];
+        8'h14: pal1 <= wdata[5:0];
+        8'h18: pal2 <= wdata[5:0];
+        8'h18: pal3 <= wdata[5:0];
+        8'h20: pal4 <= wdata[5:0];
       endcase
     end
   end
@@ -153,13 +165,6 @@ module gpu (
   wire line_starb  = in_starb & ~star(bx_, by_, sum_b, rb3);
 
 
-  // colours, RRGGBB
-  localparam C_BG    = 6'b11_11_11;
-  localparam C_FILL  = 6'b00_01_11;
-  localparam C_FILL2 = 6'b00_00_10;
-  localparam C_LINE  = 6'b00_00_01;
-  localparam C_ACCENT = 6'b00_10_01;
-
   localparam BG = 3'd0, FILL = 3'd1, FILL2 = 3'd2, LINE = 3'd3, ACCENT = 3'd4;
 
   reg [2:0] kind;
@@ -205,13 +210,13 @@ module gpu (
 
   reg [5:0] color;
   always @(*) begin
-    if (!pattern_on) color = C_BG;
+    if (!pattern_on) color = pal0;
     else case (kind)
-      FILL:    color = band[1] ? C_FILL2 : C_FILL;
-      FILL2:   color = band[1] ? C_FILL : C_FILL2;
-      LINE:    color = C_LINE;
-      ACCENT:  color = C_ACCENT;
-      default: color = C_BG;
+      FILL:    color = band[1] ? pal2 : pal1;
+      FILL2:   color = band[1] ? pal1 : pal2;
+      LINE:    color = pal3;
+      ACCENT:  color = pal4;
+      default: color = pal0;
     endcase
   end
 
