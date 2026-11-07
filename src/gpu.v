@@ -146,7 +146,7 @@ module gpu (
 
   wire [4:0] r3  = r - 5'd3;
   wire [4:0] rs  = (r >> 2) + 5'd3;
-  wire [4:0] ro  = r + 5'd8;
+  wire [4:0] ro  = (r > 5'd23) ? 5'd31 : r + 5'd8;
   wire [4:0] ro3 = ro - 5'd3;
 
   // second star, flipped inside out and shifted by half a cell
