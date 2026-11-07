@@ -61,6 +61,7 @@ module tt_um_khatam_v (
   // io. everything here answers in the same clock
   wire        io_req  = mem_req && is_io;
   wire        io_done = io_req;
+  wire        io_wr   = io_req && mem_we;
   reg  [31:0] io_rdata;
 
   wire [15:0] frame;
@@ -83,7 +84,9 @@ module tt_um_khatam_v (
   gpu gpu0 (
       .clk  (clk),
       .rst_n(rst_n),
-      .sw   (ui_in[5:0]),
+      .wr   (io_wr),
+      .waddr(mem_addr[7:0]),
+      .wdata(mem_wdata),
       .rgb  (rgb),
       .hsync(hsync),
       .vsync(vsync),
@@ -99,6 +102,6 @@ module tt_um_khatam_v (
   assign uio_out = {1'b0, cs_ram, 1'b1, 1'b1, sck, 1'b0, mosi, cs_flash};
   assign uio_oe  = 8'b1111_1111;
 
-  wire _unused = &{ena, ui_in[7:6], uio_in[7:3], uio_in[1:0], 1'b0};
+  wire _unused = &{ena, ui_in, uio_in[7:3], uio_in[1:0], 1'b0};
 
 endmodule

@@ -3,7 +3,11 @@
 module gpu (
     input  wire       clk,
     input  wire       rst_n,
-    input  wire [5:0] sw,
+
+    input  wire        wr,
+    input  wire [7:0]  waddr,
+    input  wire [31:0] wdata,
+
     output reg  [5:0] rgb,
     output reg        hsync,
     output reg        vsync,
@@ -38,17 +42,40 @@ module gpu (
   assign line   = vcount;
   assign vblank = (vcount >= 480);
 
+  // registers
+  reg [1:0]  pattern;
+  reg [1:0]  cellsize;
+  reg        breathe;
+  reg        pattern_on;
+
+  always @(posedge clk) begin
+    if (!rst_n) begin
+      pattern    <= 0;
+      cellsize   <= 0;
+      breathe    <= 1;
+      pattern_on <= 1;
+    end else if (wr) begin
+      case (waddr)
+        8'h00: begin
+          pattern    <= wdata[1:0];
+          cellsize   <= wdata[3:2];
+          breathe    <= wdata[4];
+          pattern_on <= wdata[5];
+        end
+      endcase
+    end
+  end
   // khatam star, one per 64x64 cell
   // fold the cell so the middle is at 0,0 and every quarter looks the same
   // scrolls sideways by 1 pixel every 2 frames
   wire [9:0] x = hcount + frame[10:1];
   wire [9:0] y = vcount;
 
-  // sw[3:2] = cell size: 64 (0), 32 (1) or 128 (2) pixels
+  // cell size: 64 (0), 32 (1) or 128 (2) pixels
   reg [5:0] px, py;
   reg [1:0] cx, cy;
   always @(*) begin
-    case (sw[3:2])
+    case (cellsize)
       2'd1: begin
         px = {x[4:0], 1'b0}; py = {y[4:0], 1'b0};
         cx = x[6:5];         cy = y[6:5];
@@ -67,9 +94,9 @@ module gpu (
   wire [4:0] ay = py[5] ? py[4:0] : ~py[4:0];
   wire [5:0] sum_a = ax + ay;
 
-  // radius goes up and down, 16 .. 23 (frame counts up then down). sw[4] off = stays at 20
+  // radius goes up and down, 16 .. 23 (frame counts up then down), or stays at 20
   wire [6:0] tri_wave = frame[7] ? ~frame[6:0] : frame[6:0];
-  wire [4:0] r = sw[4] ? (5'd16 + tri_wave[6:4]) : 5'd20;
+  wire [4:0] r = breathe ? (5'd16 + tri_wave[6:4]) : 5'd20;
 
   function [5:0] diag;  // 1.375 * rr
     input [4:0] rr;
@@ -125,9 +152,6 @@ module gpu (
   wire in_starb    = star(bx_, by_, sum_b, rb);
   wire line_starb  = in_starb & ~star(bx_, by_, sum_b, rb3);
 
-  // no cpu yet so the switches pick the pattern
-  wire [1:0] pattern = sw[1:0];
-
 
   // colours, RRGGBB
   localparam C_BG    = 6'b11_11_11;
@@ -181,7 +205,7 @@ module gpu (
 
   reg [5:0] color;
   always @(*) begin
-    if (!sw[5]) color = C_BG;
+    if (!pattern_on) color = C_BG;
     else case (kind)
       FILL:    color = band[1] ? C_FILL2 : C_FILL;
       FILL2:   color = band[1] ? C_FILL : C_FILL2;
