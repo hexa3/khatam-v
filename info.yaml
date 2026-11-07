@@ -8,12 +8,14 @@ project:
   clock_hz:     25000000
 
   # How many tiles your design occupies? A single tile is about 340x160 uM.
-  tiles: "1x1"
+  tiles: "2x2"
 
   top_module:  "tt_um_khatam_v"
 
   source_files:
     - "project.v"
+    - "cpu.v"
+    - "qspi.v"
     - "gpu.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
