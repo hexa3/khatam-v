@@ -6,12 +6,15 @@ module gpu (
     input  wire [5:0] sw,
     output reg  [5:0] rgb,
     output reg        hsync,
-    output reg        vsync
+    output reg        vsync,
+
+    output reg  [15:0] frame,
+    output wire [9:0]  line,
+    output wire        vblank
 );
 
   // vga timing, moved here from project.v
   reg [9:0] hcount, vcount;
-  reg [15:0] frame;
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -32,7 +35,8 @@ module gpu (
   end
 
   wire visible = (hcount < 640) && (vcount < 480);
-
+  assign line   = vcount;
+  assign vblank = (vcount >= 480);
 
   // khatam star, one per 64x64 cell
   // fold the cell so the middle is at 0,0 and every quarter looks the same

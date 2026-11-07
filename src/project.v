@@ -32,9 +32,12 @@ module tt_um_khatam_v (
       .mem_done (mem_done)
   );
 
+  wire is_io  = mem_addr[25];
   wire is_ram = mem_addr[24];
 
   // flash + psram
+  wire [31:0] spi_rdata;
+  wire        spi_done;
   wire        sck, mosi, cs_flash, cs_ram;
 
   qspi spi0 (
@@ -46,8 +49,8 @@ module tt_um_khatam_v (
       .addr    (mem_addr[23:0]),
       .wdata   (mem_wdata),
       .size    (mem_size),
-      .rdata   (mem_rdata),
-      .done    (mem_done),
+      .rdata   (spi_rdata),
+      .done    (spi_done),
       .sck     (sck),
       .mosi    (mosi),
       .miso    (uio_in[2]),
@@ -55,8 +58,27 @@ module tt_um_khatam_v (
       .cs_ram  (cs_ram)
   );
 
-  wire [5:0] rgb;
-  wire       hsync, vsync;
+  // io. everything here answers in the same clock
+  wire        io_req  = mem_req && is_io;
+  wire        io_done = io_req;
+  reg  [31:0] io_rdata;
+
+  wire [15:0] frame;
+  wire [9:0]  line;
+  wire        vblank;
+  wire [5:0]  rgb;
+  wire        hsync, vsync;
+
+  always @(*) begin
+    case (mem_addr[7:0])
+      8'hC0:   io_rdata = {16'd0, frame};
+      8'hC4:   io_rdata = {15'd0, vblank, 6'd0, line};
+      default: io_rdata = 0;
+    endcase
+  end
+
+  assign mem_rdata = is_io ? io_rdata : spi_rdata;
+  assign mem_done  = is_io ? io_done  : spi_done;
 
   gpu gpu0 (
       .clk  (clk),
@@ -64,7 +86,10 @@ module tt_um_khatam_v (
       .sw   (ui_in[5:0]),
       .rgb  (rgb),
       .hsync(hsync),
-      .vsync(vsync)
+      .vsync(vsync),
+      .frame(frame),
+      .line (line),
+      .vblank(vblank)
   );
 
   // tinyvga pmod: R1 G1 B1 vs R0 G0 B0 hs
