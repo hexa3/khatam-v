@@ -47,6 +47,7 @@ module gpu (
   reg [1:0]  cellsize;
   reg        breathe;
   reg        pattern_on;
+  reg [4:0]  radius;
   reg [5:0]  pal0, pal1, pal2, pal3, pal4;
 
   always @(posedge clk) begin
@@ -55,6 +56,7 @@ module gpu (
       cellsize   <= 0;
       breathe    <= 1;
       pattern_on <= 1;
+      radius     <= 5'd20;
       // boot up in the Fez colours so you see something straight away
       pal0 <= 6'b11_11_11;
       pal1 <= 6'b00_01_11;
@@ -69,6 +71,7 @@ module gpu (
           breathe    <= wdata[4];
           pattern_on <= wdata[5];
         end
+        8'h04: radius <= wdata[4:0];
         8'h10: pal0 <= wdata[5:0];
         8'h14: pal1 <= wdata[5:0];
         8'h18: pal2 <= wdata[5:0];
@@ -106,9 +109,9 @@ module gpu (
   wire [4:0] ay = py[5] ? py[4:0] : ~py[4:0];
   wire [5:0] sum_a = ax + ay;
 
-  // radius goes up and down, 16 .. 23 (frame counts up then down), or stays at 20
+  // radius goes up and down, 16 .. 23 (frame counts up then down), or the radius register
   wire [6:0] tri_wave = frame[7] ? ~frame[6:0] : frame[6:0];
-  wire [4:0] r = breathe ? (5'd16 + tri_wave[6:4]) : 5'd20;
+  wire [4:0] r = breathe ? (5'd16 + tri_wave[6:4]) : radius;
 
   function [5:0] diag;  // 1.375 * rr
     input [4:0] rr;
