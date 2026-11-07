@@ -48,6 +48,7 @@ module gpu (
   reg        breathe;
   reg        pattern_on;
   reg [4:0]  radius;
+  reg [9:0]  scroll_x, scroll_y;
   reg [5:0]  pal0, pal1, pal2, pal3, pal4;
 
   always @(posedge clk) begin
@@ -57,6 +58,8 @@ module gpu (
       breathe    <= 1;
       pattern_on <= 1;
       radius     <= 5'd20;
+      scroll_x   <= 0;
+      scroll_y   <= 0;
       // boot up in the Fez colours so you see something straight away
       pal0 <= 6'b11_11_11;
       pal1 <= 6'b00_01_11;
@@ -72,6 +75,8 @@ module gpu (
           pattern_on <= wdata[5];
         end
         8'h04: radius <= wdata[4:0];
+        8'h08: scroll_x <= wdata[9:0];
+        8'h0C: scroll_y <= wdata[9:0];
         8'h10: pal0 <= wdata[5:0];
         8'h14: pal1 <= wdata[5:0];
         8'h18: pal2 <= wdata[5:0];
@@ -82,9 +87,8 @@ module gpu (
   end
   // khatam star, one per 64x64 cell
   // fold the cell so the middle is at 0,0 and every quarter looks the same
-  // scrolls sideways by 1 pixel every 2 frames
-  wire [9:0] x = hcount + frame[10:1];
-  wire [9:0] y = vcount;
+  wire [9:0] x = hcount + scroll_x;
+  wire [9:0] y = vcount + scroll_y;
 
   // cell size: 64 (0), 32 (1) or 128 (2) pixels
   reg [5:0] px, py;
