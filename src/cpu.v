@@ -4,7 +4,7 @@
 module cpu (
     input  wire        clk,
     input  wire        rst_n,
-    output wire [31:0] mem_addr,
+    output wire [25:0] mem_addr,
     output wire [31:0] mem_wdata,
     output wire [2:0]  mem_size,   // 1, 2 or 4 bytes
     output wire        mem_we,
@@ -18,7 +18,7 @@ module cpu (
   localparam MEM   = 2'd2;
 
   reg [1:0]  state;
-  reg [31:0] pc;
+  reg [25:0] pc;                 // 64 MB of address space is plenty
   reg [31:0] ir;
   reg [31:0] regs [1:15];   // x0 is always 0 so it doesnt need a register
 
