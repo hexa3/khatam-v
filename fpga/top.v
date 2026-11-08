@@ -3,6 +3,7 @@
 
 module top (
     input  wire       clk,       // 50 MHz
+    input  wire [1:0] button,    // active low
     output wire [3:0] gpdi_dp
 );
 
@@ -19,13 +20,20 @@ module top (
   end
   wire rst_n = (rst_cnt == 4'hf);
 
+  // ---------------- buttons ----------------
+  reg [1:0] btn_s1 = 0, btn_s2 = 0;
+  always @(posedge clk_pix) begin
+    btn_s1 <= ~button;
+    btn_s2 <= btn_s1;
+  end
+
   // ---------------- the chip ----------------
   wire [7:0] uo_out, uio_out, uio_oe;
   wire       miso_flash, miso_ram;
   wire       miso = !uio_out[0] ? miso_flash : miso_ram;
 
   tt_um_khatam_v chip (
-      .ui_in  (8'd0),
+      .ui_in  ({6'd0, btn_s2}),
       .uo_out (uo_out),
       .uio_in ({5'd0, miso, 2'd0}),
       .uio_out(uio_out),
