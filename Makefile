@@ -6,7 +6,7 @@ OBJCOPY = llvm-objcopy
 
 CFLAGS = --target=riscv32-unknown-elf -march=rv32e -mabi=ilp32e -Os -ffreestanding -nostdlib -mno-relax -Wall -Isdk
 
-all: build/hello.bin
+all: build/hello.bin build/hello.hex
 
 build/hello.o: games/hello.c sdk/khatam.h
 	mkdir -p build
@@ -21,6 +21,10 @@ build/hello.elf: build/crt0.o build/hello.o sdk/link.ld
 
 build/hello.bin: build/hello.elf
 	$(OBJCOPY) -O binary $< $@
+
+# one byte per line, for $$readmemh in the FPGA build
+build/hello.hex: build/hello.bin
+	od -An -tx1 -v $< | tr -s ' ' '\n' | sed '/^$$/d' > $@
 
 clean:
 	rm -rf build
