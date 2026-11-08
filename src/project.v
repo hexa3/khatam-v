@@ -98,9 +98,9 @@ module tt_um_khatam_v (
   // tinyvga pmod: R1 G1 B1 vs R0 G0 B0 hs
   assign uo_out = {hsync, rgb[0], rgb[2], rgb[4], vsync, rgb[1], rgb[3], rgb[5]};
 
-  // uio: 0 flash cs, 1 mosi, 2 miso, 3 sck, 4+5 io2/io3 (held high), 6 psram cs
+  // uio: 0 flash cs, 1 mosi, 2 miso (input), 3 sck, 4+5 io2/io3 (held high), 6 psram cs
   assign uio_out = {1'b0, cs_ram, 1'b1, 1'b1, sck, 1'b0, mosi, cs_flash};
-  assign uio_oe  = 8'b1111_1111;
+  assign uio_oe  = 8'b1111_1011;
 
   wire _unused = &{ena, ui_in, uio_in[7:3], uio_in[1:0], 1'b0};
 
