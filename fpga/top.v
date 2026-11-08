@@ -11,14 +11,14 @@ module top (
   wire clk_pix, clk_shift, locked;
   pll pll_i (.clk_in(clk), .clk_shift(clk_shift), .clk_pix(clk_pix), .locked(locked));
 
-  reg [3:0] rst_cnt = 0;
+  reg [7:0] rst_cnt = 0;
   always @(posedge clk_pix) begin
     if (!locked)
       rst_cnt <= 0;
-    else if (rst_cnt != 4'hf)
+    else if (rst_cnt != 8'hff)
       rst_cnt <= rst_cnt + 1;
   end
-  wire rst_n = (rst_cnt == 4'hf);
+  wire rst_n = (rst_cnt == 8'hff);
 
   // ---------------- buttons ----------------
   reg [1:0] btn_s1 = 0, btn_s2 = 0;
