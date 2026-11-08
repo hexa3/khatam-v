@@ -1,1 +1,5 @@
 build/
+fpga/khatam_v.json
+fpga/khatam_v.config
+fpga/khatam_v.bit
+fpga/firmware.hex
