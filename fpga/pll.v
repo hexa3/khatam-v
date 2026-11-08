@@ -1,5 +1,7 @@
 // 50 MHz in -> 125 MHz (TMDS shift clock) + 25 MHz (pixel clock)
 // from: ecppll -i 50 -o 125 -s 25
+// the pixel clock is pushed 2 VCO cycles late (CPHASE 26 instead of 24) so its
+// edges land in between the 125 MHz edges
 `default_nettype none
 
 module pll (
@@ -29,7 +31,7 @@ module pll (
       .CLKOP_FPHASE(0),
       .CLKOS_ENABLE("ENABLED"),
       .CLKOS_DIV(25),
-      .CLKOS_CPHASE(24),
+      .CLKOS_CPHASE(26),
       .CLKOS_FPHASE(0),
       .FEEDBK_PATH("CLKOP"),
       .CLKFB_DIV(5)
