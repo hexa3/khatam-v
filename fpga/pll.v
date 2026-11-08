@@ -1,7 +1,11 @@
 // 50 MHz in -> 125 MHz (TMDS shift clock) + 25 MHz (pixel clock)
-// from: ecppll -i 50 -o 125 -s 25
-// the pixel clock is pushed 2 VCO cycles late (CPHASE 26 instead of 24) so its
-// edges land in between the 125 MHz edges
+// numbers came from: ecppll -i 50 -o 125 -s 25
+//   VCO = 50 / 2 * 5 * 5 = 625 MHz
+//   CLKOP = 625 / 5  = 125 MHz
+//   CLKOS = 625 / 25 = 25 MHz
+// the pixel clock is pushed 2 VCO cycles (3.2 ns) late (CPHASE 26 instead
+// of 24) so its edges land in between the 125 MHz edges. makes the hand-off
+// in dvi_out.v nice and safe.
 `default_nettype none
 
 module pll (
