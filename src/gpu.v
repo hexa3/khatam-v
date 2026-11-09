@@ -30,8 +30,38 @@ module gpu (
 
   wire visible = (hcount < 640) && (vcount < 480);
 
-  // test stripes
-  wire [5:0] color = {hcount[7:6], hcount[7:6], vcount[7:6]};
+  // khatam star pattern
+  wire [9:0] x = hcount;
+  wire [9:0] y = vcount;
+
+  wire [5:0] px = x[5:0];
+  wire [5:0] py = y[5:0];
+
+  wire [4:0] ax = px[5] ? px[4:0] : ~px[4:0];
+  wire [4:0] ay = py[5] ? py[4:0] : ~py[4:0];
+  wire [5:0] sum_a = ax + ay;
+
+  wire [4:0] r = 5'd20;
+
+  function [5:0] diag;  // 1.375 * rr
+    input [4:0] rr;
+    begin
+      diag = rr + (rr >> 1) - (rr >> 3);
+    end
+  endfunction
+
+  function star;
+    input [4:0] a, b;
+    input [5:0] s;
+    input [4:0] rr;
+    begin
+      star = ((a <= rr) && (b <= rr)) || (s <= diag(rr));
+    end
+  endfunction
+
+  wire in_star = star(ax, ay, sum_a, r);
+
+  wire [5:0] color = in_star ? 6'b00_01_11 : 6'b11_11_11;
 
   always @(posedge clk) begin
     if (!rst_n) begin
