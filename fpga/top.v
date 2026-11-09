@@ -66,7 +66,7 @@ module top (
     vsync_d <= vsync;
 
     if (hsync_d && !hsync)
-      h <= 656;
+      h <= 657;
     else if (h == 799)
       h <= 0;
     else
