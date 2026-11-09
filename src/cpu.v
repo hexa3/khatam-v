@@ -69,6 +69,8 @@ module cpu (
 
   // alu, one thing for each instruction
   wire [4:0] shamt = b[4:0];
+  wire signed [31:0] sa = a;
+  wire [31:0] sra = sa >>> shamt;
   reg  [31:0] alu;
   always @(*) begin
     case (f3)
@@ -77,7 +79,7 @@ module cpu (
       3'b010:  alu = ($signed(a) < $signed(b)) ? 1 : 0;
       3'b011:  alu = (a < b) ? 1 : 0;
       3'b100:  alu = a ^ b;
-      3'b101:  alu = ir[30] ? ($signed(a) >>> shamt) : (a >> shamt);
+      3'b101:  alu = ir[30] ? sra : (a >> shamt);
       3'b110:  alu = a | b;
       default: alu = a & b;
     endcase
