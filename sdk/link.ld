@@ -14,8 +14,20 @@ SECTIONS
     *(.text.start)
     *(.text*)
     *(.rodata*)
+    *(.srodata*)
+    . = ALIGN(4);
   } > FLASH
 
-  .data : { *(.data*) } > RAM
-  .bss  : { *(.bss*) } > RAM
+  .data : {
+    _data_start = .;
+    *(.data*)
+    *(.sdata*)
+    . = ALIGN(4);
+    _data_end = .;
+  } > RAM AT > FLASH
+  _data_load = LOADADDR(.data);
+
+  .bss : { *(.bss*) } > RAM
+
+  _stack_top = ORIGIN(RAM) + LENGTH(RAM);
 }

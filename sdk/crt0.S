@@ -1,7 +1,20 @@
-# startup code
+# startup code: set up the stack, copy .data to RAM, run main
+
 .section .text.start
 .global _start
 _start:
-    li   sp, 0x1800000      # top of the psram
-    call main
-1:  j    1b
+    la   sp, _stack_top
+
+    # copy initialised variables from flash to RAM
+    la   a0, _data_load
+    la   a1, _data_start
+    la   a2, _data_end
+1:  beq  a1, a2, 2f
+    lw   t0, 0(a0)
+    sw   t0, 0(a1)
+    addi a0, a0, 4
+    addi a1, a1, 4
+    j    1b
+
+2:  call main
+3:  j    3b
