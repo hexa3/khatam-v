@@ -43,7 +43,7 @@ module tt_um_khatam_v (
   qspi spi0 (
       .clk     (clk),
       .rst_n   (rst_n),
-      .req     (mem_req),
+      .req     (mem_req && !is_io),
       .we      (mem_we),
       .ram     (is_ram),
       .addr    (mem_addr[23:0]),
