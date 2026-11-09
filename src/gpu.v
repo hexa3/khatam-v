@@ -80,7 +80,7 @@ module gpu (
         8'h10: pal0 <= wdata[5:0];
         8'h14: pal1 <= wdata[5:0];
         8'h18: pal2 <= wdata[5:0];
-        8'h18: pal3 <= wdata[5:0];
+        8'h1C: pal3 <= wdata[5:0];
         8'h20: pal4 <= wdata[5:0];
       endcase
     end
