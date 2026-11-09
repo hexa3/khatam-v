@@ -42,6 +42,8 @@ module gpu (
   wire [5:0] sum_a = ax + ay;
 
   wire [4:0] r = 5'd20;
+  wire [4:0] r3  = r - 5'd3;
+  wire [4:0] rs  = (r >> 2) + 5'd3;
 
   function [5:0] diag;  // 1.375 * rr
     input [4:0] rr;
@@ -59,9 +61,22 @@ module gpu (
     end
   endfunction
 
-  wire in_star = star(ax, ay, sum_a, r);
+  function octagon;
+    input [4:0] a, b;
+    input [5:0] s;
+    input [4:0] rr;
+    begin
+      octagon = (a <= rr) && (b <= rr) && (s <= diag(rr));
+    end
+  endfunction
 
-  wire [5:0] color = in_star ? 6'b00_01_11 : 6'b11_11_11;
+  wire in_star    = star(ax, ay, sum_a, r);
+  wire line_star  = in_star & ~star(ax, ay, sum_a, r3);
+  wire rosette    = octagon(ax, ay, sum_a, rs);
+
+  wire [5:0] color = line_star ? 6'b00_00_01 :
+                     rosette   ? 6'b00_10_01 :
+                     in_star   ? 6'b00_01_11 : 6'b11_11_11;
 
   always @(posedge clk) begin
     if (!rst_n) begin
