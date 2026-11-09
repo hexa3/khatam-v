@@ -59,9 +59,10 @@ module cpu (
   reg [31:0] load_val;
   always @(*) begin
     case (f3)
-      3'b000, 3'b100: load_val = {24'd0, mem_rdata[7:0]};
+      3'b000:  load_val = {{24{mem_rdata[7]}}, mem_rdata[7:0]};
+      3'b100:  load_val = {24'd0, mem_rdata[7:0]};
       3'b001, 3'b101: load_val = {16'd0, mem_rdata[15:0]};
-      default:        load_val = mem_rdata;
+      default: load_val = mem_rdata;
     endcase
   end
 
