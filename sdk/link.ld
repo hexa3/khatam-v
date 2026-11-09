@@ -27,7 +27,14 @@ SECTIONS
   } > RAM AT > FLASH
   _data_load = LOADADDR(.data);
 
-  .bss : { *(.bss*) } > RAM
+  .bss (NOLOAD) : {
+    _bss_start = .;
+    *(.bss*)
+    *(.sbss*)
+    *(COMMON)
+    . = ALIGN(4);
+    _bss_end = .;
+  } > RAM
 
   _stack_top = ORIGIN(RAM) + LENGTH(RAM);
 }
