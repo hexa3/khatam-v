@@ -125,7 +125,7 @@ module cpu (
             end
             OP_JALR: begin
               regs[rd] <= pc + 4;
-              pc       <= a + imm_i;
+              pc       <= (a + imm_i) & 32'hfffffffe;   // jalr clears bit 0
             end
             OP_BRANCH: if (take) pc <= pc + imm_b;
             OP_IMM, OP_REG: regs[rd] <= alu;
