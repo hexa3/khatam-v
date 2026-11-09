@@ -90,8 +90,8 @@ module cpu (
       3'b001:  take = (a != b);
       3'b100:  take = ($signed(a) < $signed(b));
       3'b101:  take = ($signed(a) >= $signed(b));
-      3'b110:  take = (a >= b);
-      3'b111:  take = (a < b);
+      3'b110:  take = (a < b);
+      3'b111:  take = (a >= b);
       default: take = 0;
     endcase
   end
