@@ -58,6 +58,6 @@ module spi_bram #(
     end
   end
 
-  assign miso = rbyte[dbits[2:0]];
+  assign miso = rbyte[7 - dbits[2:0]];
 
 endmodule
