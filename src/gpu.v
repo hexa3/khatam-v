@@ -31,7 +31,7 @@ module gpu (
   wire visible = (hcount < 640) && (vcount < 480);
 
   // test stripes
-  wire [5:0] color = {hcont[7:6], hcount[7:6], vcount[7:6]};
+  wire [5:0] color = {hcount[7:6], hcount[7:6], vcount[7:6]};
 
   always @(posedge clk) begin
     if (!rst_n) begin
