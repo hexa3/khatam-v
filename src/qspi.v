@@ -42,8 +42,13 @@ module qspi (
   reg        phase;     // 0 = about to raise sck, 1 = about to drop it
   reg [2:0]  nbytes;
 
+  // byte swap helpers. first byte on the wire = lowest byte
+  wire [31:0] wswap = {wdata[7:0], wdata[15:8], wdata[23:16], wdata[31:24]};
+
+  // read data comes straight out of the shift register (only looked at when done = 1)
   assign rdata = (nbytes == 3'd1) ? {24'd0, rx[7:0]} :
-                 (nbytes == 3'd2) ? {16'd0, rx[15:0]} : rx;
+                 (nbytes == 3'd2) ? {16'd0, rx[7:0], rx[15:8]} :
+                                    {rx[7:0], rx[15:8], rx[23:16], rx[31:24]};
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -87,8 +92,8 @@ module qspi (
               if (state == CMD) begin
                 state <= DATA;
                 bits  <= {nbytes, 3'b000};
-                tx    <= wdata << {(3'd4 - nbytes), 3'b000};   // first byte on top
-                mosi  <= wdata[31 - 8 * (4 - nbytes)];
+                tx    <= wswap;
+                mosi  <= wswap[31];
               end else begin
                 done     <= 1;
                 state    <= IDLE;
