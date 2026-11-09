@@ -42,9 +42,6 @@ module qspi (
   reg        phase;     // 0 = about to raise sck, 1 = about to drop it
   reg [2:0]  nbytes;
 
-  reg        miso_d;    // miso one clock later
-  always @(posedge clk) miso_d <= miso;
-
   assign rdata = (nbytes == 3'd1) ? {24'd0, rx[7:0]} :
                  (nbytes == 3'd2) ? {16'd0, rx[15:0]} : rx;
 
@@ -78,10 +75,10 @@ module qspi (
           if (phase == 0) begin
             sck   <= 1;
             phase <= 1;
-            rx    <= {rx[30:0], miso_d};
           end else begin
             sck   <= 0;
             phase <= 0;
+            rx    <= {rx[30:0], miso};
             tx    <= {tx[30:0], 1'b0};
             mosi  <= tx[30];
             bits  <= bits - 1;
