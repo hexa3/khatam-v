@@ -30,13 +30,16 @@ module gpu (
 
   wire visible = (hcount < 640) && (vcount < 480);
 
+  // test stripes
+  wire [5:0] color = {hcont[7:6], hcount[7:6], vcount[7:6]};
+
   always @(posedge clk) begin
     if (!rst_n) begin
       rgb   <= 0;
       hsync <= 1;
       vsync <= 1;
     end else begin
-      rgb   <= visible ? 6'b111111 : 6'd0;
+      rgb   <= visible ? color : 6'd0;
       hsync <= ~((hcount >= 656) && (hcount < 752));
       vsync <= ~((vcount >= 490) && (vcount < 492));
     end
