@@ -4,6 +4,8 @@ module gpu (
     input  wire        clk,
     input  wire        rst_n,
 
+    input  wire [1:0]  pattern,    // from the buttons for now
+
     output reg  [5:0]  rgb,        // RRGGBB
     output reg         hsync,
     output reg         vsync,
@@ -99,8 +101,6 @@ module gpu (
   wire [5:0] ripple = sum_a + frame[6:3];
 
   localparam BG = 3'd0, FILL = 3'd1, FILL2 = 3'd2, LINE = 3'd3, ACCENT = 3'd4;
-
-  wire [1:0] pattern = 2'd3;   // TODO change from the cpu later
 
   reg [2:0] kind;
   reg       on_b;

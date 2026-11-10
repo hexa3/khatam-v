@@ -17,6 +17,7 @@ module tt_um_khatam_v (
   gpu gpu0 (
       .clk    (clk),
       .rst_n  (rst_n),
+      .pattern(ui_in[1:0]),
       .rgb    (rgb),
       .hsync  (hsync),
       .vsync  (vsync)
@@ -28,6 +29,6 @@ module tt_um_khatam_v (
   assign uio_out = 0;
   assign uio_oe  = 0;
 
-  wire _unused = &{ena, ui_in, uio_in, 1'b0};
+  wire _unused = &{ena, ui_in[7:2], uio_in, 1'b0};
 
 endmodule
