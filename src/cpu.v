@@ -92,11 +92,17 @@ module cpu (
             case (opcode)
               OP_LUI:         regs[rd] <= imm_u;
               OP_AUIPC:       regs[rd] <= {6'd0, pc} + imm_u;
+              OP_JAL, OP_JALR: regs[rd] <= {6'd0, pc + 26'd4};
               OP_IMM, OP_REG: regs[rd] <= alu;
               default: ;
             endcase
           end
-          pc    <= pc + 4;
+          if (opcode == OP_JAL)
+            pc <= pc + imm_j[25:0];
+          else if (opcode == OP_JALR)
+            pc <= (rs1_val[25:0] + imm_i[25:0]) & ~26'd1;
+          else
+            pc <= pc + 4;
           state <= FETCH;
         end
 
