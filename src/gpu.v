@@ -264,12 +264,17 @@ module gpu (
     input [9:0] h, v, cx_, cy_;
     input [4:0] sz;
     input [1:0] shp;
-    reg   [9:0] adx, ady;
-    reg   [5:0] s;
-    reg   [4:0] q;
+    reg   [10:0] dx, dy;
+    reg   [9:0]  adx, ady;
+    reg   [5:0]  s;
+    reg   [4:0]  q;
     begin
-      adx = (h > cx_) ? h - cx_ : cx_ - h;
-      ady = (v > cy_) ? v - cy_ : cy_ - v;
+      dx  = {1'b0, h} - {1'b0, cx_};
+      dy  = {1'b0, v} - {1'b0, cy_};
+      // fold with ~ instead of a real negate (same trick as the pattern),
+      // saves an adder and the shape just ends up centred on a half pixel
+      adx = dx[10] ? ~dx[9:0] : dx[9:0];
+      ady = dy[10] ? ~dy[9:0] : dy[9:0];
       s   = adx[4:0] + ady[4:0];
       q   = sz - (sz >> 2) - (sz >> 4);   // about sz / sqrt(2)
       if (adx > 31 || ady > 31)
