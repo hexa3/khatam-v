@@ -68,6 +68,20 @@ module cpu (
     endcase
   end
 
+  // branches
+  reg take;
+  always @(*) begin
+    case (f3)
+      3'b000:  take = (rs1_val == rs2_val);
+      3'b001:  take = (rs1_val != rs2_val);
+      3'b100:  take = ($signed(rs1_val) < $signed(rs2_val));
+      3'b101:  take = ($signed(rs1_val) >= $signed(rs2_val));
+      3'b110:  take = (rs1_val < rs2_val);
+      3'b111:  take = (rs1_val >= rs2_val);
+      default: take = 0;
+    endcase
+  end
+
   // memory bus (only fetch for now)
   assign mem_req   = (state == FETCH);
   assign mem_addr  = pc;
@@ -99,6 +113,8 @@ module cpu (
           end
           if (opcode == OP_JAL)
             pc <= pc + imm_j[25:0];
+          else if (opcode == OP_BRANCH && take)
+            pc <= pc + imm_b[25:0];
           else if (opcode == OP_JALR)
             pc <= (rs1_val[25:0] + imm_i[25:0]) & ~26'd1;
           else
