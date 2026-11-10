@@ -18,6 +18,8 @@ module tt_um_khatam_v (
       .clk    (clk),
       .rst_n  (rst_n),
       .pattern(ui_in[1:0]),
+      .cellsize(ui_in[3:2]),
+      .scroll (ui_in[4]),
       .rgb    (rgb),
       .hsync  (hsync),
       .vsync  (vsync)
@@ -29,6 +31,6 @@ module tt_um_khatam_v (
   assign uio_out = 0;
   assign uio_oe  = 0;
 
-  wire _unused = &{ena, ui_in[7:2], uio_in, 1'b0};
+  wire _unused = &{ena, ui_in[7:5], uio_in, 1'b0};
 
 endmodule

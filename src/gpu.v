@@ -5,6 +5,8 @@ module gpu (
     input  wire        rst_n,
 
     input  wire [1:0]  pattern,    // from the buttons for now
+    input  wire [1:0]  cellsize,
+    input  wire        scroll,
 
     output reg  [5:0]  rgb,        // RRGGBB
     output reg         hsync,
@@ -37,13 +39,30 @@ module gpu (
   wire visible = (hcount < 640) && (vcount < 480);
 
   // khatam star pattern
-  wire [9:0] x = hcount;
-  wire [9:0] y = vcount;
+  wire [9:0] scroll_x = scroll ? frame[9:0] : 10'd0;
+  wire [9:0] scroll_y = 0;
+  wire [9:0] x = hcount + scroll_x;
+  wire [9:0] y = vcount + scroll_y;
 
-  wire [5:0] px = x[5:0];
-  wire [5:0] py = y[5:0];
-  wire [1:0] cx = x[7:6];
-  wire [1:0] cy = y[7:6];
+  // cell size: 0 = 64px, 1 = 32px, 2 = 128px
+  reg [5:0] px, py;
+  reg [1:0] cx, cy;
+  always @(*) begin
+    case (cellsize)
+      2'd1: begin
+        px = {x[4:0], 1'b0}; py = {y[4:0], 1'b0};
+        cx = x[6:5];         cy = y[6:5];
+      end
+      2'd2: begin
+        px = x[6:1];         py = y[6:1];
+        cx = x[8:7];         cy = y[8:7];
+      end
+      default: begin
+        px = x[5:0];         py = y[5:0];
+        cx = x[7:6];         cy = y[7:6];
+      end
+    endcase
+  end
 
   wire [4:0] ax = px[5] ? px[4:0] : ~px[4:0];
   wire [4:0] ay = py[5] ? py[4:0] : ~py[4:0];

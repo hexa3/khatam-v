@@ -21,9 +21,9 @@ pinout:
   # Inputs
   ui[0]: "pattern bit 0"
   ui[1]: "pattern bit 1"
-  ui[2]: ""
-  ui[3]: ""
-  ui[4]: ""
+  ui[2]: "cell size bit 0"
+  ui[3]: "cell size bit 1"
+  ui[4]: "scroll"
   ui[5]: ""
   ui[6]: ""
   ui[7]: ""
