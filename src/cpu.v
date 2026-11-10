@@ -51,6 +51,23 @@ module cpu (
   wire [31:0] rs1_val = (rs1 == 0) ? 32'd0 : regs[rs1];
   wire [31:0] rs2_val = (rs2 == 0) ? 32'd0 : regs[rs2];
 
+  // ALU
+  wire [31:0] b_in = (opcode == OP_REG) ? rs2_val : imm_i;
+
+  reg [31:0] alu;
+  always @(*) begin
+    case (f3)
+      3'b000:  alu = (opcode == OP_REG && ir[30]) ? rs1_val - b_in : rs1_val + b_in;
+      3'b001:  alu = rs1_val << b_in[4:0];
+      3'b010:  alu = ($signed(rs1_val) < $signed(b_in)) ? 32'd1 : 32'd0;
+      3'b011:  alu = (rs1_val < b_in) ? 32'd1 : 32'd0;
+      3'b100:  alu = rs1_val ^ b_in;
+      3'b101:  alu = ir[30] ? $signed(rs1_val) >>> b_in[4:0] : rs1_val >> b_in[4:0];
+      3'b110:  alu = rs1_val | b_in;
+      default: alu = rs1_val & b_in;
+    endcase
+  end
+
   // memory bus (only fetch for now)
   assign mem_req   = (state == FETCH);
   assign mem_addr  = pc;
@@ -71,6 +88,8 @@ module cpu (
         end
 
         EXEC: begin
+          if ((opcode == OP_IMM || opcode == OP_REG) && rd != 0)
+            regs[rd] <= alu;
           pc    <= pc + 4;
           state <= FETCH;
         end
