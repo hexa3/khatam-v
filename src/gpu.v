@@ -306,7 +306,9 @@ module gpu (
       ady = (v > cy_) ? v - cy_ : cy_ - v;
       s   = adx[4:0] + ady[4:0];
       q   = sz - (sz >> 2) - (sz >> 4);   // about sz / sqrt(2)
-      case (shp)
+      if (adx > 31 || ady > 31)
+        in_shape = 0;
+      else case (shp)
         2'd0: in_shape = (adx[4:0] <= sz) && (ady[4:0] <= sz);                        // square
         2'd1: in_shape = (s <= sz);                                                   // diamond
         2'd2: in_shape = ((adx[4:0] <= q) && (ady[4:0] <= q)) || (s <= sz);           // star
