@@ -53,21 +53,25 @@ module gpu (
 
   reg [9:0]  sx0, sy0;
   reg [4:0]  ssize0;
+  reg [1:0]  sshape0;
   reg        son0;
   reg [5:0]  scol0;
 
   reg [9:0]  sx1, sy1;
   reg [4:0]  ssize1;
+  reg [1:0]  sshape1;
   reg        son1;
   reg [5:0]  scol1;
 
   reg [9:0]  sx2, sy2;
   reg [4:0]  ssize2;
+  reg [1:0]  sshape2;
   reg        son2;
   reg [5:0]  scol2;
 
   reg [9:0]  sx3, sy3;
   reg [4:0]  ssize3;
+  reg [1:0]  sshape3;
   reg        son3;
   reg [5:0]  scol3;
 
@@ -109,30 +113,34 @@ module gpu (
         8'h40: sx0 <= wdata[9:0];
         8'h44: sy0 <= wdata[9:0];
         8'h48: begin
-          ssize0 <= wdata[4:0];
-          son0   <= wdata[7];
-          scol0  <= wdata[13:8];
+          ssize0  <= wdata[4:0];
+          sshape0 <= wdata[6:5];
+          son0    <= wdata[7];
+          scol0   <= wdata[13:8];
         end
         8'h50: sx1 <= wdata[9:0];
         8'h54: sy1 <= wdata[9:0];
         8'h58: begin
-          ssize1 <= wdata[4:0];
-          son1   <= wdata[7];
-          scol1  <= wdata[13:8];
+          ssize1  <= wdata[4:0];
+          sshape1 <= wdata[6:5];
+          son1    <= wdata[7];
+          scol1   <= wdata[13:8];
         end
         8'h60: sx2 <= wdata[9:0];
         8'h64: sy2 <= wdata[9:0];
         8'h68: begin
-          ssize2 <= wdata[4:0];
-          son2   <= wdata[7];
-          scol2  <= wdata[13:8];
+          ssize2  <= wdata[4:0];
+          sshape2 <= wdata[6:5];
+          son2    <= wdata[7];
+          scol2   <= wdata[13:8];
         end
         8'h70: sx3 <= wdata[9:0];
         8'h74: sy3 <= wdata[9:0];
         8'h78: begin
-          ssize3 <= wdata[4:0];
-          son3   <= wdata[7];
-          scol3  <= wdata[13:8];
+          ssize3  <= wdata[4:0];
+          sshape3 <= wdata[6:5];
+          son3    <= wdata[7];
+          scol3   <= wdata[13:8];
         end
       endcase
     end
@@ -280,19 +288,32 @@ module gpu (
   end
 
   // ================= sprites =================
-  // squares for now, x/y is the middle
-  wire [9:0] dx0 = (hcount > sx0) ? hcount - sx0 : sx0 - hcount;
-  wire [9:0] dy0 = (vcount > sy0) ? vcount - sy0 : sy0 - vcount;
-  wire hit0 = son0 && (dx0 <= ssize0) && (dy0 <= ssize0);
-  wire [9:0] dx1 = (hcount > sx1) ? hcount - sx1 : sx1 - hcount;
-  wire [9:0] dy1 = (vcount > sy1) ? vcount - sy1 : sy1 - vcount;
-  wire hit1 = son1 && (dx1 <= ssize1) && (dy1 <= ssize1);
-  wire [9:0] dx2 = (hcount > sx2) ? hcount - sx2 : sx2 - hcount;
-  wire [9:0] dy2 = (vcount > sy2) ? vcount - sy2 : sy2 - vcount;
-  wire hit2 = son2 && (dx2 <= ssize2) && (dy2 <= ssize2);
-  wire [9:0] dx3 = (hcount > sx3) ? hcount - sx3 : sx3 - hcount;
-  wire [9:0] dy3 = (vcount > sy3) ? vcount - sy3 : sy3 - vcount;
-  wire hit3 = son3 && (dx3 <= ssize3) && (dy3 <= ssize3);
+  // shape: 0 square, 1 diamond, 2 star, 3 octagon. x/y is the middle
+  wire hit0 = son0 && in_shape(hcount, vcount, sx0, sy0, ssize0, sshape0);
+  wire hit1 = son1 && in_shape(hcount, vcount, sx1, sy1, ssize1, sshape1);
+  wire hit2 = son2 && in_shape(hcount, vcount, sx2, sy2, ssize2, sshape2);
+  wire hit3 = son3 && in_shape(hcount, vcount, sx3, sy3, ssize3, sshape3);
+
+  function in_shape;
+    input [9:0] h, v, cx_, cy_;
+    input [4:0] sz;
+    input [1:0] shp;
+    reg   [9:0] adx, ady;
+    reg   [5:0] s;
+    reg   [4:0] q;
+    begin
+      adx = (h > cx_) ? h - cx_ : cx_ - h;
+      ady = (v > cy_) ? v - cy_ : cy_ - v;
+      s   = adx[4:0] + ady[4:0];
+      q   = sz - (sz >> 2) - (sz >> 4);   // about sz / sqrt(2)
+      case (shp)
+        2'd0: in_shape = (adx[4:0] <= sz) && (ady[4:0] <= sz);                        // square
+        2'd1: in_shape = (s <= sz);                                                   // diamond
+        2'd2: in_shape = ((adx[4:0] <= q) && (ady[4:0] <= q)) || (s <= sz);           // star
+        default: in_shape = (adx[4:0] <= sz) && (ady[4:0] <= sz) && (s <= diag(sz));  // octagon
+      endcase
+    end
+  endfunction
 
   reg [5:0] color;
   always @(*) begin
