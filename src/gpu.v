@@ -6,7 +6,9 @@ module gpu (
 
     output reg  [5:0]  rgb,        // RRGGBB
     output reg         hsync,
-    output reg         vsync
+    output reg         vsync,
+
+    output reg  [15:0] frame
 );
 
   // VGA timing 640x480
@@ -16,10 +18,12 @@ module gpu (
     if (!rst_n) begin
       hcount <= 0;
       vcount <= 0;
+      frame  <= 0;
     end else if (hcount == 799) begin
       hcount <= 0;
       if (vcount == 524) begin
         vcount <= 0;
+        frame  <= frame + 1;
       end else begin
         vcount <= vcount + 1;
       end
@@ -41,7 +45,9 @@ module gpu (
   wire [4:0] ay = py[5] ? py[4:0] : ~py[4:0];
   wire [5:0] sum_a = ax + ay;
 
-  wire [4:0] r = 5'd20;
+  // breathing: radius goes up and down with the frame counter
+  wire [6:0] tri_wave = frame[7] ? ~frame[6:0] : frame[6:0];
+  wire [4:0] r   = 5'd16 + tri_wave[6:4];
   wire [4:0] r3  = r - 5'd3;
   wire [4:0] rs  = (r >> 2) + 5'd3;
 
