@@ -40,6 +40,8 @@ module gpu (
 
   wire [5:0] px = x[5:0];
   wire [5:0] py = y[5:0];
+  wire [1:0] cx = x[7:6];
+  wire [1:0] cy = y[7:6];
 
   wire [4:0] ax = px[5] ? px[4:0] : ~px[4:0];
   wire [4:0] ay = py[5] ? py[4:0] : ~py[4:0];
@@ -80,9 +82,28 @@ module gpu (
   wire line_star  = in_star & ~star(ax, ay, sum_a, r3);
   wire rosette    = octagon(ax, ay, sum_a, rs);
 
-  wire [5:0] color = line_star ? 6'b00_00_01 :
-                     rosette   ? 6'b00_10_01 :
-                     in_star   ? 6'b00_01_11 : 6'b11_11_11;
+  localparam BG = 3'd0, FILL = 3'd1, FILL2 = 3'd2, LINE = 3'd3, ACCENT = 3'd4;
+
+  reg [2:0] kind;
+  always @(*) begin
+    if (line_star)    kind = LINE;
+    else if (rosette) kind = ACCENT;
+    else if (in_star) kind = FILL;
+    else              kind = BG;
+  end
+
+  // colour bands that move across the screen
+  wire [1:0] band = cx + cy - frame[6:5];
+
+  reg [5:0] color;
+  always @(*) begin
+    case (kind)
+      FILL:    color = band[1] ? 6'b00_00_10 : 6'b00_01_11;
+      LINE:    color = 6'b00_00_01;
+      ACCENT:  color = 6'b00_10_01;
+      default: color = 6'b11_11_11;
+    endcase
+  end
 
   always @(posedge clk) begin
     if (!rst_n) begin
