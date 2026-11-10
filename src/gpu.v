@@ -52,6 +52,8 @@ module gpu (
   wire [4:0] r   = 5'd16 + tri_wave[6:4];
   wire [4:0] r3  = r - 5'd3;
   wire [4:0] rs  = (r >> 2) + 5'd3;
+  wire [4:0] ro  = (r > 5'd23) ? 5'd31 : r + 5'd8;
+  wire [4:0] ro3 = ro - 5'd3;
 
   function [5:0] diag;  // 1.375 * rr
     input [4:0] rr;
@@ -81,15 +83,30 @@ module gpu (
   wire in_star    = star(ax, ay, sum_a, r);
   wire line_star  = in_star & ~star(ax, ay, sum_a, r3);
   wire rosette    = octagon(ax, ay, sum_a, rs);
+  wire in_oct     = octagon(ax, ay, sum_a, ro);
+  wire line_oct   = in_oct & ~octagon(ax, ay, sum_a, ro3);
+  wire small_star = star(ax, ay, sum_a, rs);
 
   localparam BG = 3'd0, FILL = 3'd1, FILL2 = 3'd2, LINE = 3'd3, ACCENT = 3'd4;
 
+  wire [1:0] pattern = 2'd1;   // TODO change from the cpu later
+
   reg [2:0] kind;
   always @(*) begin
-    if (line_star)    kind = LINE;
-    else if (rosette) kind = ACCENT;
-    else if (in_star) kind = FILL;
-    else              kind = BG;
+    case (pattern)
+      2'd0: begin
+        if (line_star)    kind = LINE;
+        else if (rosette) kind = ACCENT;
+        else if (in_star) kind = FILL;
+        else              kind = BG;
+      end
+      default: begin
+        if (line_oct)        kind = LINE;
+        else if (small_star) kind = ACCENT;
+        else if (in_oct)     kind = FILL;
+        else                 kind = BG;
+      end
+    endcase
   end
 
   // colour bands that move across the screen
