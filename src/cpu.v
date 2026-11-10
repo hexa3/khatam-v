@@ -31,6 +31,26 @@ module cpu (
   wire [3:0] rs2    = ir[23:20];
   wire [6:0] f7     = ir[31:25];
 
+  wire [31:0] imm_i = {{20{ir[31]}}, ir[31:20]};
+  wire [31:0] imm_s = {{20{ir[31]}}, ir[31:25], ir[11:7]};
+  wire [31:0] imm_b = {{20{ir[31]}}, ir[11:8], ir[30:25], ir[7], 1'b0};
+  wire [31:0] imm_u = {ir[31:12], 12'd0};
+  wire [31:0] imm_j = {{12{ir[31]}}, ir[19:12], ir[20], ir[30:21], 1'b0};
+
+  localparam OP_LUI    = 7'b0110111;
+  localparam OP_AUIPC  = 7'b0010111;
+  localparam OP_JAL    = 7'b1101111;
+  localparam OP_JALR   = 7'b1100111;
+  localparam OP_BRANCH = 7'b1100011;
+  localparam OP_LOAD   = 7'b0000011;
+  localparam OP_STORE  = 7'b0100011;
+  localparam OP_IMM    = 7'b0010011;
+  localparam OP_REG    = 7'b0110011;
+
+  // register file, x0 is always 0
+  wire [31:0] rs1_val = (rs1 == 0) ? 32'd0 : regs[rs1];
+  wire [31:0] rs2_val = (rs2 == 0) ? 32'd0 : regs[rs2];
+
   // memory bus (only fetch for now)
   assign mem_req   = (state == FETCH);
   assign mem_addr  = pc;
