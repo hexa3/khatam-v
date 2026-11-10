@@ -51,6 +51,11 @@ module gpu (
   reg [9:0]  scroll_x, scroll_y;
   reg [5:0]  pal0, pal1, pal2, pal3, pal4;
 
+  reg [9:0]  sx0, sy0;
+  reg [4:0]  ssize0;
+  reg        son0;
+  reg [5:0]  scol0;
+
   always @(posedge clk) begin
     if (!rst_n) begin
       pattern    <= 0;
@@ -66,6 +71,7 @@ module gpu (
       pal2 <= 6'b00_00_10;
       pal3 <= 6'b00_00_01;
       pal4 <= 6'b00_10_01;
+      son0 <= 0;
     end else if (wr) begin
       case (waddr)
         8'h00: begin
@@ -82,6 +88,13 @@ module gpu (
         8'h18: pal2 <= wdata[5:0];
         8'h1C: pal3 <= wdata[5:0];
         8'h20: pal4 <= wdata[5:0];
+        8'h40: sx0 <= wdata[9:0];
+        8'h44: sy0 <= wdata[9:0];
+        8'h48: begin
+          ssize0 <= wdata[4:0];
+          son0   <= wdata[7];
+          scol0  <= wdata[13:8];
+        end
       endcase
     end
   end
@@ -215,16 +228,28 @@ module gpu (
   wire [1:0] cy2  = on_b ? cy + py[5] : cy;
   wire [1:0] band = cx2 + cy2 - frame[6:5];
 
+  reg [5:0] bg_color;
+  always @(*) begin
+    if (!pattern_on) bg_color = pal0;
+    else case (kind)
+      FILL:    bg_color = band[1] ? pal2 : pal1;
+      FILL2:   bg_color = band[1] ? pal1 : pal2;
+      LINE:    bg_color = pal3;
+      ACCENT:  bg_color = pal4;
+      default: bg_color = pal0;
+    endcase
+  end
+
+  // ================= sprite 0 =================
+  // a square for now, x/y is the middle
+  wire [9:0] dx0 = (hcount > sx0) ? hcount - sx0 : sx0 - hcount;
+  wire [9:0] dy0 = (vcount > sy0) ? vcount - sy0 : sy0 - vcount;
+  wire hit0 = son0 && (dx0 <= ssize0) && (dy0 <= ssize0);
+
   reg [5:0] color;
   always @(*) begin
-    if (!pattern_on) color = pal0;
-    else case (kind)
-      FILL:    color = band[1] ? pal2 : pal1;
-      FILL2:   color = band[1] ? pal1 : pal2;
-      LINE:    color = pal3;
-      ACCENT:  color = pal4;
-      default: color = pal0;
-    endcase
+    if (hit0) color = scol0;
+    else      color = bg_color;
   end
 
   // registered outputs so nothing glitches
