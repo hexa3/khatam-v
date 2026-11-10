@@ -82,12 +82,25 @@ module cpu (
     endcase
   end
 
-  // memory bus (only fetch for now)
-  assign mem_req   = (state == FETCH);
-  assign mem_addr  = pc;
-  assign mem_size  = 3'd4;
-  assign mem_we    = 0;
-  assign mem_wdata = 0;
+  // memory bus
+  wire [31:0] addr = rs1_val + ((opcode == OP_STORE) ? imm_s : imm_i);
+
+  assign mem_req   = (state == FETCH) || (state == MEM);
+  assign mem_addr  = (state == FETCH) ? pc : addr[25:0];
+  assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
+  assign mem_we    = (state == MEM) && (opcode == OP_STORE);
+  assign mem_wdata = rs2_val;
+
+  reg [31:0] load_val;
+  always @(*) begin
+    case (f3)
+      3'b000:  load_val = {{24{mem_rdata[7]}}, mem_rdata[7:0]};    // LB
+      3'b001:  load_val = {{16{mem_rdata[15]}}, mem_rdata[15:0]};  // LH
+      3'b100:  load_val = {24'd0, mem_rdata[7:0]};                 // LBU
+      3'b101:  load_val = {16'd0, mem_rdata[15:0]};                // LHU
+      default: load_val = mem_rdata;                               // LW
+    endcase
+  end
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -102,23 +115,34 @@ module cpu (
         end
 
         EXEC: begin
-          if (rd != 0) begin
-            case (opcode)
-              OP_LUI:         regs[rd] <= imm_u;
-              OP_AUIPC:       regs[rd] <= {6'd0, pc} + imm_u;
-              OP_JAL, OP_JALR: regs[rd] <= {6'd0, pc + 26'd4};
-              OP_IMM, OP_REG: regs[rd] <= alu;
-              default: ;
-            endcase
+          if (opcode == OP_LOAD || opcode == OP_STORE) begin
+            state <= MEM;
+          end else begin
+              if (rd != 0) begin
+                case (opcode)
+                  OP_LUI:         regs[rd] <= imm_u;
+                  OP_AUIPC:       regs[rd] <= {6'd0, pc} + imm_u;
+                  OP_JAL, OP_JALR: regs[rd] <= {6'd0, pc + 26'd4};
+                  OP_IMM, OP_REG: regs[rd] <= alu;
+                  default: ;
+                endcase
+              end
+              if (opcode == OP_JAL)
+                pc <= pc + imm_j[25:0];
+              else if (opcode == OP_BRANCH && take)
+                pc <= pc + imm_b[25:0];
+              else if (opcode == OP_JALR)
+                pc <= (rs1_val[25:0] + imm_i[25:0]) & ~26'd1;
+              else
+                pc <= pc + 4;
+              state <= FETCH;
           end
-          if (opcode == OP_JAL)
-            pc <= pc + imm_j[25:0];
-          else if (opcode == OP_BRANCH && take)
-            pc <= pc + imm_b[25:0];
-          else if (opcode == OP_JALR)
-            pc <= (rs1_val[25:0] + imm_i[25:0]) & ~26'd1;
-          else
-            pc <= pc + 4;
+        end
+
+        MEM: if (mem_done) begin
+          if (opcode == OP_LOAD && rd != 0)
+            regs[rd] <= load_val;
+          pc    <= pc + 4;
           state <= FETCH;
         end
 
