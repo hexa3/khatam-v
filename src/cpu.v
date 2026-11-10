@@ -88,8 +88,14 @@ module cpu (
         end
 
         EXEC: begin
-          if ((opcode == OP_IMM || opcode == OP_REG) && rd != 0)
-            regs[rd] <= alu;
+          if (rd != 0) begin
+            case (opcode)
+              OP_LUI:         regs[rd] <= imm_u;
+              OP_AUIPC:       regs[rd] <= {6'd0, pc} + imm_u;
+              OP_IMM, OP_REG: regs[rd] <= alu;
+              default: ;
+            endcase
+          end
           pc    <= pc + 4;
           state <= FETCH;
         end
