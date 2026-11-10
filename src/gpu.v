@@ -56,6 +56,21 @@ module gpu (
   reg        son0;
   reg [5:0]  scol0;
 
+  reg [9:0]  sx1, sy1;
+  reg [4:0]  ssize1;
+  reg        son1;
+  reg [5:0]  scol1;
+
+  reg [9:0]  sx2, sy2;
+  reg [4:0]  ssize2;
+  reg        son2;
+  reg [5:0]  scol2;
+
+  reg [9:0]  sx3, sy3;
+  reg [4:0]  ssize3;
+  reg        son3;
+  reg [5:0]  scol3;
+
   always @(posedge clk) begin
     if (!rst_n) begin
       pattern    <= 0;
@@ -72,6 +87,9 @@ module gpu (
       pal3 <= 6'b00_00_01;
       pal4 <= 6'b00_10_01;
       son0 <= 0;
+      son1 <= 0;
+      son2 <= 0;
+      son3 <= 0;
     end else if (wr) begin
       case (waddr)
         8'h00: begin
@@ -94,6 +112,27 @@ module gpu (
           ssize0 <= wdata[4:0];
           son0   <= wdata[7];
           scol0  <= wdata[13:8];
+        end
+        8'h50: sx1 <= wdata[9:0];
+        8'h54: sy1 <= wdata[9:0];
+        8'h58: begin
+          ssize1 <= wdata[4:0];
+          son1   <= wdata[7];
+          scol1  <= wdata[13:8];
+        end
+        8'h60: sx2 <= wdata[9:0];
+        8'h64: sy2 <= wdata[9:0];
+        8'h68: begin
+          ssize2 <= wdata[4:0];
+          son2   <= wdata[7];
+          scol2  <= wdata[13:8];
+        end
+        8'h70: sx3 <= wdata[9:0];
+        8'h74: sy3 <= wdata[9:0];
+        8'h78: begin
+          ssize3 <= wdata[4:0];
+          son3   <= wdata[7];
+          scol3  <= wdata[13:8];
         end
       endcase
     end
@@ -240,16 +279,28 @@ module gpu (
     endcase
   end
 
-  // ================= sprite 0 =================
-  // a square for now, x/y is the middle
+  // ================= sprites =================
+  // squares for now, x/y is the middle
   wire [9:0] dx0 = (hcount > sx0) ? hcount - sx0 : sx0 - hcount;
   wire [9:0] dy0 = (vcount > sy0) ? vcount - sy0 : sy0 - vcount;
   wire hit0 = son0 && (dx0 <= ssize0) && (dy0 <= ssize0);
+  wire [9:0] dx1 = (hcount > sx1) ? hcount - sx1 : sx1 - hcount;
+  wire [9:0] dy1 = (vcount > sy1) ? vcount - sy1 : sy1 - vcount;
+  wire hit1 = son1 && (dx1 <= ssize1) && (dy1 <= ssize1);
+  wire [9:0] dx2 = (hcount > sx2) ? hcount - sx2 : sx2 - hcount;
+  wire [9:0] dy2 = (vcount > sy2) ? vcount - sy2 : sy2 - vcount;
+  wire hit2 = son2 && (dx2 <= ssize2) && (dy2 <= ssize2);
+  wire [9:0] dx3 = (hcount > sx3) ? hcount - sx3 : sx3 - hcount;
+  wire [9:0] dy3 = (vcount > sy3) ? vcount - sy3 : sy3 - vcount;
+  wire hit3 = son3 && (dx3 <= ssize3) && (dy3 <= ssize3);
 
   reg [5:0] color;
   always @(*) begin
-    if (hit0) color = scol0;
-    else      color = bg_color;
+    if (hit0)      color = scol0;
+    else if (hit1) color = scol1;
+    else if (hit2) color = scol2;
+    else if (hit3) color = scol3;
+    else           color = bg_color;
   end
 
   // registered outputs so nothing glitches
