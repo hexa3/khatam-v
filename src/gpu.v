@@ -51,29 +51,12 @@ module gpu (
   reg [9:0]  scroll_x, scroll_y;
   reg [5:0]  pal0, pal1, pal2, pal3, pal4;
 
-  reg [9:0]  sx0, sy0;
-  reg [4:0]  ssize0;
-  reg [1:0]  sshape0;
-  reg        son0;
-  reg [5:0]  scol0;
-
-  reg [9:0]  sx1, sy1;
-  reg [4:0]  ssize1;
-  reg [1:0]  sshape1;
-  reg        son1;
-  reg [5:0]  scol1;
-
-  reg [9:0]  sx2, sy2;
-  reg [4:0]  ssize2;
-  reg [1:0]  sshape2;
-  reg        son2;
-  reg [5:0]  scol2;
-
-  reg [9:0]  sx3, sy3;
-  reg [4:0]  ssize3;
-  reg [1:0]  sshape3;
-  reg        son3;
-  reg [5:0]  scol3;
+  reg [9:0]  sx [0:3];
+  reg [9:0]  sy [0:3];
+  reg [4:0]  ssize [0:3];
+  reg [1:0]  sshape [0:3];
+  reg        son [0:3];
+  reg [5:0]  scol [0:3];
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -90,10 +73,7 @@ module gpu (
       pal2 <= 6'b00_00_10;
       pal3 <= 6'b00_00_01;
       pal4 <= 6'b00_10_01;
-      son0 <= 0;
-      son1 <= 0;
-      son2 <= 0;
-      son3 <= 0;
+      son[0] <= 0; son[1] <= 0; son[2] <= 0; son[3] <= 0;
     end else if (wr) begin
       case (waddr)
         8'h00: begin
@@ -110,37 +90,21 @@ module gpu (
         8'h18: pal2 <= wdata[5:0];
         8'h1C: pal3 <= wdata[5:0];
         8'h20: pal4 <= wdata[5:0];
-        8'h40: sx0 <= wdata[9:0];
-        8'h44: sy0 <= wdata[9:0];
-        8'h48: begin
-          ssize0  <= wdata[4:0];
-          sshape0 <= wdata[6:5];
-          son0    <= wdata[7];
-          scol0   <= wdata[13:8];
-        end
-        8'h50: sx1 <= wdata[9:0];
-        8'h54: sy1 <= wdata[9:0];
-        8'h58: begin
-          ssize1  <= wdata[4:0];
-          sshape1 <= wdata[6:5];
-          son1    <= wdata[7];
-          scol1   <= wdata[13:8];
-        end
-        8'h60: sx2 <= wdata[9:0];
-        8'h64: sy2 <= wdata[9:0];
-        8'h68: begin
-          ssize2  <= wdata[4:0];
-          sshape2 <= wdata[6:5];
-          son2    <= wdata[7];
-          scol2   <= wdata[13:8];
-        end
-        8'h70: sx3 <= wdata[9:0];
-        8'h74: sy3 <= wdata[9:0];
-        8'h78: begin
-          ssize3  <= wdata[4:0];
-          sshape3 <= wdata[6:5];
-          son3    <= wdata[7];
-          scol3   <= wdata[13:8];
+        default: begin
+          // shape sprites 0x40..0x7F
+          if (waddr[7:6] == 2'b01) begin
+            case (waddr[3:2])
+              2'd0: sx[waddr[5:4]] <= wdata[9:0];
+              2'd1: sy[waddr[5:4]] <= wdata[9:0];
+              2'd2: begin
+                ssize[waddr[5:4]]  <= wdata[4:0];
+                sshape[waddr[5:4]] <= wdata[6:5];
+                son[waddr[5:4]]    <= wdata[7];
+                scol[waddr[5:4]]   <= wdata[13:8];
+              end
+              default: ;
+            endcase
+          end
         end
       endcase
     end
@@ -287,12 +251,14 @@ module gpu (
     endcase
   end
 
-  // ================= sprites =================
+  // ================= shape sprites =================
   // shape: 0 square, 1 diamond, 2 star, 3 octagon. x/y is the middle
-  wire hit0 = son0 && in_shape(hcount, vcount, sx0, sy0, ssize0, sshape0);
-  wire hit1 = son1 && in_shape(hcount, vcount, sx1, sy1, ssize1, sshape1);
-  wire hit2 = son2 && in_shape(hcount, vcount, sx2, sy2, ssize2, sshape2);
-  wire hit3 = son3 && in_shape(hcount, vcount, sx3, sy3, ssize3, sshape3);
+  reg [3:0] shape_hit;
+  integer i;
+  always @(*) begin
+    for (i = 0; i < 4; i = i + 1)
+      shape_hit[i] = son[i] && in_shape(hcount, vcount, sx[i], sy[i], ssize[i], sshape[i]);
+  end
 
   function in_shape;
     input [9:0] h, v, cx_, cy_;
@@ -319,11 +285,11 @@ module gpu (
 
   reg [5:0] color;
   always @(*) begin
-    if (hit0)      color = scol0;
-    else if (hit1) color = scol1;
-    else if (hit2) color = scol2;
-    else if (hit3) color = scol3;
-    else           color = bg_color;
+    if (shape_hit[0])      color = scol[0];
+    else if (shape_hit[1]) color = scol[1];
+    else if (shape_hit[2]) color = scol[2];
+    else if (shape_hit[3]) color = scol[3];
+    else                   color = bg_color;
   end
 
   // registered outputs so nothing glitches
