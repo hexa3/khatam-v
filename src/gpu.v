@@ -93,10 +93,14 @@ module gpu (
   wire in_oct     = octagon(ax, ay, sum_a, ro);
   wire line_oct   = in_oct & ~octagon(ax, ay, sum_a, ro3);
   wire small_star = star(ax, ay, sum_a, rs);
+  wire [5:0] dd   = r + 5'd9;
+  wire in_dia     = (sum_a <= dd);
+  wire line_dia   = in_dia && (sum_a > dd - 6'd3);
+  wire [5:0] ripple = sum_a + frame[6:3];
 
   localparam BG = 3'd0, FILL = 3'd1, FILL2 = 3'd2, LINE = 3'd3, ACCENT = 3'd4;
 
-  wire [1:0] pattern = 2'd2;   // TODO change from the cpu later
+  wire [1:0] pattern = 2'd3;   // TODO change from the cpu later
 
   reg [2:0] kind;
   reg       on_b;
@@ -115,7 +119,7 @@ module gpu (
         else if (in_oct)     kind = FILL;
         else                 kind = BG;
       end
-      default: begin
+      2'd2: begin
         // second set of stars sitting in the gaps of the first
         if (line_star && line_starb)  kind = (px[5] ^ py[5]) ? LINE : ACCENT;
         else if (line_star)           kind = LINE;
@@ -123,6 +127,12 @@ module gpu (
         else if (in_star && in_starb) kind = FILL2;
         else if (in_star)             kind = FILL;
         else if (in_starb) begin      kind = FILL; on_b = 1; end
+        else                          kind = BG;
+      end
+      default: begin
+        if (line_dia)                 kind = LINE;
+        else if (sum_a <= {1'b0, rs}) kind = ACCENT;
+        else if (in_dia)              kind = ripple[2] ? FILL : FILL2;
         else                          kind = BG;
       end
     endcase
