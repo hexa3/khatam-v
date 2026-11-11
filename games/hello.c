@@ -2,10 +2,15 @@
 
 int speed = 3;
 
+// an F so i can see if its mirrored
+static const u8 letter[8] = {0x7e, 0x60, 0x60, 0x7c, 0x60, 0x60, 0x60, 0x00};
+
 int main(void)
 {
     // pattern 2, breathing on, pattern on
     GPU_PATTERN = INTERLACED | (1 << 4) | (1 << 5);
+
+    bitmap(0, 300, 40, 3, RGB(3, 3, 3), letter);
 
     int x = 0;
     int sx = 100, sy = 100, dx = 3, dy = 2;
