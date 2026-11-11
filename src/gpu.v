@@ -59,11 +59,12 @@ module gpu (
   reg        son [0:3];
   reg [5:0]  scol [0:3];
 
-  reg [9:0]  bx0, by0;
-  reg [1:0]  bscale0;
-  reg        bon0;
-  reg [5:0]  bcol0;
-  reg [63:0] bbits0;
+  reg [9:0]  bx [0:1];
+  reg [9:0]  by [0:1];
+  reg [1:0]  bscale [0:1];
+  reg        bon [0:1];
+  reg [5:0]  bcol [0:1];
+  reg [63:0] bbits [0:1];
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -81,7 +82,7 @@ module gpu (
       pal3 <= 6'b00_00_01;
       pal4 <= 6'b00_10_01;
       son[0] <= 0; son[1] <= 0; son[2] <= 0; son[3] <= 0;
-      bon0 <= 0;
+      bon[0] <= 0; bon[1] <= 0;
     end else if (wr) begin
       case (waddr)
         8'h00: begin
@@ -98,15 +99,6 @@ module gpu (
         8'h18: pal2 <= wdata[5:0];
         8'h1C: pal3 <= wdata[5:0];
         8'h20: pal4 <= wdata[5:0];
-        8'h80: bx0 <= wdata[9:0];
-        8'h84: by0 <= wdata[9:0];
-        8'h88: begin
-          bscale0 <= wdata[1:0];
-          bon0    <= wdata[7];
-          bcol0   <= wdata[13:8];
-        end
-        8'h8C: bbits0[31:0]  <= wdata;
-        8'h90: bbits0[63:32] <= wdata;
         default: begin
           // shape sprites 0x40..0x7F
           if (waddr[7:6] == 2'b01) begin
@@ -119,6 +111,21 @@ module gpu (
                 son[waddr[5:4]]    <= wdata[7];
                 scol[waddr[5:4]]   <= wdata[13:8];
               end
+              default: ;
+            endcase
+          end
+          // bitmap sprites 0x80..0xBF
+          if (waddr[7:6] == 2'b10) begin
+            case (waddr[4:2])
+              3'd0: bx[waddr[5]] <= wdata[9:0];
+              3'd1: by[waddr[5]] <= wdata[9:0];
+              3'd2: begin
+                bscale[waddr[5]] <= wdata[1:0];
+                bon[waddr[5]]    <= wdata[7];
+                bcol[waddr[5]]   <= wdata[13:8];
+              end
+              3'd3: bbits[waddr[5]][31:0]  <= wdata;
+              3'd4: bbits[waddr[5]][63:32] <= wdata;
               default: ;
             endcase
           end
@@ -325,11 +332,13 @@ module gpu (
     end
   endfunction
 
-  wire bm0 = bon0 && bitmap_px(hcount, vcount, bx0, by0, bscale0, bbits0);
+  wire bm0 = bon[0] && bitmap_px(hcount, vcount, bx[0], by[0], bscale[0], bbits[0]);
+  wire bm1 = bon[1] && bitmap_px(hcount, vcount, bx[1], by[1], bscale[1], bbits[1]);
 
   reg [5:0] color;
   always @(*) begin
-    if (bm0)               color = bcol0;
+    if (bm0)               color = bcol[0];
+    else if (bm1)          color = bcol[1];
     else if (shape_hit[0]) color = scol[0];
     else if (shape_hit[1]) color = scol[1];
     else if (shape_hit[2]) color = scol[2];
