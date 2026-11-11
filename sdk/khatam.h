@@ -20,4 +20,21 @@ typedef unsigned char  u8;
 #define LINE           IO(0xC4)
 #define BUTTONS        IO(0xD0)
 
+static inline void background(int pattern, int cell, int breathe)
+{
+    GPU_PATTERN = pattern | (cell << 2) | (breathe << 4) | (1 << 5);
+}
+
+static inline void wait_vblank(void)
+{
+    u32 f = FRAME;
+    while (FRAME == f)
+        ;
+}
+
+static inline u32 buttons(void)
+{
+    return BUTTONS;
+}
+
 #endif

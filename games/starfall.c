@@ -8,7 +8,7 @@ int main(void)
 
     while (1) {
         // buttons pick the pattern for now
-        u32 b = BUTTONS;
+        u32 b = buttons();
         if (b & 1)
             pattern = 0;
         if (b & 2)
@@ -17,6 +17,6 @@ int main(void)
             pattern = 2;
         if (b & 8)
             pattern = 3;
-        GPU_PATTERN = pattern | (1 << 4) | (1 << 5);
+        background(pattern, 0, 1);
     }
 }
