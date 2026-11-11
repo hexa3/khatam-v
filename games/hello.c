@@ -21,7 +21,10 @@ int main(void)
         if (buttons() & 2)
             sx += 4;
 
-        shape(0, sx, sy, 16, STAR, RGB(3, 3, 0));
+        // turns red when it touches a line of the pattern
+        u32 hit = COLLIDE;
+        COLLIDE = 0;
+        shape(0, sx, sy, 16, STAR, (hit & HIT_LINE(0)) ? RGB(3, 0, 0) : RGB(3, 3, 0));
         sx += dx;
         sy += dy;
         if (sx < 20 || sx > 620)
