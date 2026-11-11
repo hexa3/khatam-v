@@ -29,7 +29,11 @@ module qspi (
   reg [31:0] rx;          // shifts in
   reg [5:0]  bits;        // bits left in this phase
   reg        phase;       // 0 = about to raise sck, 1 = about to drop it
+  reg        writing;
   reg [2:0]  nbytes;
+
+  // byte swap helpers. first byte on the wire = lowest byte
+  wire [31:0] wswap = {wdata[7:0], wdata[15:8], wdata[23:16], wdata[31:24]};
 
   // read data comes straight out of the shift register (only looked at when done = 1)
   assign rdata = (nbytes == 3'd1) ? {24'd0, rx[7:0]} :
@@ -51,12 +55,13 @@ module qspi (
 
         IDLE: begin
           if (req && !done) begin
+            writing <= we;
             nbytes  <= size;
             // start a new command
             if (ram) cs_ram   <= 0;
             else     cs_flash <= 0;
-            tx    <= {8'h03, addr};
-            mosi  <= 0;               // first bit of 0x03 is 0
+            tx    <= {(we ? 8'h02 : 8'h03), addr};
+            mosi  <= 0;               // first bit of 0x02/0x03 is 0
             bits  <= 6'd32;
             phase <= 0;
             state <= CMD;
@@ -80,8 +85,8 @@ module qspi (
                 // address sent, now the data
                 state <= DATA;
                 bits  <= {nbytes, 3'b000};
-                tx    <= 0;
-                mosi  <= 0;
+                tx    <= wswap;
+                mosi  <= wswap[31];
               end else begin
                 // all done
                 done     <= 1;
