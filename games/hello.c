@@ -10,6 +10,8 @@ int main(void)
     int x = 0;
     int sx = 100, sy = 100, dx = 3, dy = 2;
     while (1) {
+        wait_vblank();
+
         GPU_SCROLLX = x;
         x += speed;
 
@@ -20,8 +22,5 @@ int main(void)
             dx = -dx;
         if (sy < 20 || sy > 460)
             dy = -dy;
-
-        for (volatile int i = 0; i < 20000; i++)
-            ;
     }
 }

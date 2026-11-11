@@ -16,6 +16,9 @@ typedef unsigned char  u8;
 #define GPU_SCROLLY    IO(0x0C)
 #define GPU_PAL(n)     IO(0x10 + 4 * (n))
 
+#define FRAME          IO(0xC0)
+#define LINE           IO(0xC4)
+
 #define SHAPE_X(n)     IO(0x40 + 16 * (n))
 #define SHAPE_Y(n)     IO(0x44 + 16 * (n))
 #define SHAPE_CTRL(n)  IO(0x48 + 16 * (n))
@@ -45,6 +48,13 @@ static inline void shape(int n, int x, int y, int size, int kind, int colour)
 static inline void shape_off(int n)
 {
     SHAPE_CTRL(n) = 0;
+}
+
+static inline void wait_vblank(void)
+{
+    u32 f = FRAME;
+    while (FRAME == f)
+        ;
 }
 
 #endif
