@@ -12,7 +12,9 @@ module gpu (
     output reg         hsync,
     output reg         vsync,
 
-    output reg  [15:0] frame
+    output reg  [15:0] frame,
+    output wire [9:0]  line,
+    output wire        vblank
 );
 
   // VGA timing 640x480
@@ -37,6 +39,8 @@ module gpu (
   end
 
   wire visible = (hcount < 640) && (vcount < 480);
+  assign line   = vcount;
+  assign vblank = (vcount >= 480);
 
   // khatam star pattern
   wire [9:0] scroll_x = scroll ? frame[9:0] : 10'd0;
