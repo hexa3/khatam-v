@@ -13,11 +13,14 @@ all: build/starfall.bin
 build/starfall.o: games/starfall.c sdk/khatam.h | build
 	$(CC) $(CFLAGS) -c games/starfall.c -o build/starfall.o
 
+build/sdk.o: sdk/khatam.c sdk/khatam.h | build
+	$(CC) $(CFLAGS) -c sdk/khatam.c -o build/sdk.o
+
 build/crt0.o: sdk/crt0.S | build
 	$(CC) $(CFLAGS) -c sdk/crt0.S -o build/crt0.o
 
-build/starfall.elf: build/crt0.o build/starfall.o sdk/link.ld
-	$(LD) -T sdk/link.ld build/crt0.o build/starfall.o -o build/starfall.elf
+build/starfall.elf: build/crt0.o build/starfall.o build/sdk.o sdk/link.ld
+	$(LD) -T sdk/link.ld build/crt0.o build/starfall.o build/sdk.o -o build/starfall.elf
 
 build/starfall.bin: build/starfall.elf
 	$(OBJCOPY) -O binary build/starfall.elf build/starfall.bin
