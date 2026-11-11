@@ -20,7 +20,7 @@ _start:
 2:  la   a1, _bss_start
     la   a2, _bss_end
 3:  beq  a1, a2, 4f
-    sw   zero, 0(a0)
+    sw   zero, 0(a1)
     addi a1, a1, 4
     j    3b
 
