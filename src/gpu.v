@@ -14,7 +14,8 @@ module gpu (
 
     output reg  [15:0] frame,
     output wire [9:0]  line,
-    output wire        vblank
+    output wire        vblank,
+    output reg  [3:0]  collide    // sprite touched a line of the pattern
 );
 
   // vga timing, moved here from project.v
@@ -295,6 +296,17 @@ module gpu (
     else if (shape_hit[2]) color = scol[2];
     else if (shape_hit[3]) color = scol[3];
     else                   color = bg_color;
+  end
+
+  // did a sprite touch one of the lines of the pattern
+  wire bg_line = pattern_on && (kind == LINE);
+
+  always @(posedge clk) begin
+    if (!rst_n) begin
+      collide <= 0;
+    end else if (visible && bg_line) begin
+      collide <= collide | shape_hit;
+    end
   end
 
   // registered outputs so nothing glitches
