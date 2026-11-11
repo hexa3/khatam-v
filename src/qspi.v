@@ -31,7 +31,7 @@ module qspi (
   reg        phase;       // 0 = about to raise sck, 1 = about to drop it
   reg [2:0]  nbytes;
 
-  assign rdata = 32'd0;   // TODO
+  assign rdata = rx;
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -57,6 +57,35 @@ module qspi (
             bits  <= 6'd32;
             phase <= 0;
             state <= CMD;
+          end
+        end
+
+        CMD, DATA: begin
+          if (phase == 0) begin
+            sck   <= 1;
+            phase <= 1;
+          end else begin
+            sck   <= 0;
+            phase <= 0;
+            rx    <= {rx[30:0], miso};
+            tx    <= {tx[30:0], 1'b0};
+            mosi  <= tx[30];
+            bits  <= bits - 1;
+
+            if (bits == 1) begin
+              if (state == CMD) begin
+                // address sent, now the data
+                state <= DATA;
+                bits  <= {nbytes, 3'b000};
+                tx    <= 0;
+                mosi  <= 0;
+              end else begin
+                // all done
+                state    <= IDLE;
+                cs_flash <= 1;
+                cs_ram   <= 1;
+              end
+            end
           end
         end
       endcase
