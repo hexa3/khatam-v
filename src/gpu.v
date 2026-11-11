@@ -301,8 +301,10 @@ module gpu (
   // did a sprite touch one of the lines of the pattern
   wire bg_line = pattern_on && (kind == LINE);
 
+  wire clear_collide = wr && (waddr == 8'hC8);
+
   always @(posedge clk) begin
-    if (!rst_n) begin
+    if (!rst_n || clear_collide) begin
       collide <= 0;
     end else if (visible && bg_line) begin
       collide <= collide | shape_hit;
