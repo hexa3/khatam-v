@@ -45,7 +45,8 @@ typedef unsigned char  u8;
 
 // collision bits
 #define HIT_LINE(n)   (1u << (n))        // sprite n touched a pattern line
-#define HIT_SPRITE(n) (1u << (4 + (n)))  // sprite n touched another sprite
+#define HIT_SPRITE(n) (1u << (6 + (n)))  // sprite n touched another sprite
+// sprite numbers for those: shapes are 0-3, bitmaps are 4 and 5
 
 // colour from 0-3 per channel
 #define RGB(r, g, b) (((r) << 4) | ((g) << 2) | (b))
