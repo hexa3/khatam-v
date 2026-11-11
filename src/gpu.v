@@ -15,7 +15,7 @@ module gpu (
     output reg  [15:0] frame,
     output wire [9:0]  line,
     output wire        vblank,
-    output reg  [3:0]  collide    // sprite touched a line of the pattern
+    output reg  [7:0]  collide    // [3:0] sprite touched a line, [7:4] sprite touched a sprite
 );
 
   // vga timing, moved here from project.v
@@ -301,13 +301,17 @@ module gpu (
   // did a sprite touch one of the lines of the pattern
   wire bg_line = pattern_on && (kind == LINE);
 
+  // two sprites on the same pixel = more than one bit set
+  wire crowd = (shape_hit & (shape_hit - 4'd1)) != 0;
+
   wire clear_collide = wr && (waddr == 8'hC8);
 
   always @(posedge clk) begin
     if (!rst_n || clear_collide) begin
       collide <= 0;
-    end else if (visible && bg_line) begin
-      collide <= collide | shape_hit;
+    end else if (visible) begin
+      if (bg_line) collide[3:0] <= collide[3:0] | shape_hit;
+      if (crowd)   collide[7:4] <= collide[7:4] | shape_hit;
     end
   end
 
