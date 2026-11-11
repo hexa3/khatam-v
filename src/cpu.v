@@ -82,6 +82,22 @@ module cpu (
     endcase
   end
 
+  // multiply (just the mul half of the M extension)
+  wire        is_mul  = (opcode == OP_REG) && (f7 == 7'b0000001);
+  wire [63:0] prod_uu = rs1_val * rs2_val;
+  wire [63:0] prod_ss = $signed(rs1_val) * $signed(rs2_val);
+  wire [63:0] prod_su = $signed(rs1_val) * $signed({1'b0, rs2_val});
+
+  reg [31:0] mul_out;
+  always @(*) begin
+    case (f3[1:0])
+      2'b00:   mul_out = prod_uu[31:0];    // MUL
+      2'b01:   mul_out = prod_ss[63:32];   // MULH
+      2'b10:   mul_out = prod_su[63:32];   // MULHSU
+      default: mul_out = prod_uu[63:32];   // MULHU
+    endcase
+  end
+
   // memory bus
   wire [31:0] addr = rs1_val + ((opcode == OP_STORE) ? imm_s : imm_i);
 
@@ -124,7 +140,8 @@ module cpu (
                   OP_LUI:         regs[rd] <= imm_u;
                   OP_AUIPC:       regs[rd] <= {6'd0, pc} + imm_u;
                   OP_JAL, OP_JALR: regs[rd] <= {6'd0, pc + 26'd4};
-                  OP_IMM, OP_REG: regs[rd] <= alu;
+                  OP_IMM:         regs[rd] <= alu;
+                  OP_REG:         regs[rd] <= is_mul ? mul_out : alu;
                   default: ;
                 endcase
               end
