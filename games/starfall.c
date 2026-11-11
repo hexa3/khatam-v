@@ -1,26 +1,24 @@
-// Starfall
+// Starfall - catch the falling stars
 
 #include "khatam.h"
 
+static int px = 304;
+
 int main(void)
 {
-    int pattern = 0;
+    background(0, 0, 1);
 
     while (1) {
         wait_vblank();
         u32 frame = FRAME;
 
-        // buttons pick the pattern for now
+        // move the player
         u32 b = buttons();
-        if (b & 1)
-            pattern = 0;
-        if (b & 2)
-            pattern = 1;
-        if (b & 4)
-            pattern = 2;
-        if (b & 8)
-            pattern = 3;
-        background(pattern, 0, 1);
+        if ((b & 1) && px > 4)
+            px -= 6;
+        if ((b & 2) && px < 640)
+            px += 6;
+        shape(0, px, 420, 16, SQUARE, 0x38);
 
         // slowly drift the background
         GPU_SCROLLX = frame >> 1;
