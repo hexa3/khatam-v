@@ -253,15 +253,23 @@ module gpu (
     input [1:0] shp;
     reg   [10:0] dx, dy;
     reg   [9:0]  adx, ady;
+    reg   [5:0]  s;
+    reg   [4:0]  q;
     begin
       dx  = {1'b0, h} - {1'b0, cx_};
       dy  = {1'b0, v} - {1'b0, cy_};
       adx = dx[10] ? -dx[9:0] : dx[9:0];
       ady = dy[10] ? -dy[9:0] : dy[9:0];
+      s   = adx[4:0] + ady[4:0];
+      q   = sz - (sz >> 2) - (sz >> 4);   // about sz / sqrt(2)
       if (adx > 31 || ady > 31)
         in_shape = 0;
-      else
-        in_shape = (adx[4:0] <= sz) && (ady[4:0] <= sz);   // square
+      else case (shp)
+        2'd0: in_shape = (adx[4:0] <= sz) && (ady[4:0] <= sz);                        // square
+        2'd1: in_shape = (s <= sz);                                                   // diamond
+        2'd2: in_shape = ((adx[4:0] <= q) && (ady[4:0] <= q)) || (s <= sz);           // star
+        default: in_shape = (adx[4:0] <= sz) && (ady[4:0] <= sz) && (s <= diag(sz));  // octagon
+      endcase
     end
   endfunction
 
