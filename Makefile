@@ -10,10 +10,10 @@ CFLAGS = --target=riscv32-unknown-elf -march=rv32e_zmmul -mabi=ilp32e \
 
 all: build/starfall.bin
 
-build/starfall.o: games/starfall.c sdk/khatam.h
+build/starfall.o: games/starfall.c sdk/khatam.h | build
 	$(CC) $(CFLAGS) -c games/starfall.c -o build/starfall.o
 
-build/crt0.o: sdk/crt0.S
+build/crt0.o: sdk/crt0.S | build
 	$(CC) $(CFLAGS) -c sdk/crt0.S -o build/crt0.o
 
 build/starfall.elf: build/crt0.o build/starfall.o sdk/link.ld
@@ -21,6 +21,9 @@ build/starfall.elf: build/crt0.o build/starfall.o sdk/link.ld
 
 build/starfall.bin: build/starfall.elf
 	$(OBJCOPY) -O binary build/starfall.elf build/starfall.bin
+
+build:
+	mkdir -p build
 
 clean:
 	rm -rf build
