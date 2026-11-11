@@ -47,6 +47,7 @@ module qspi (
       mosi     <= 0;
       cs_flash <= 1;
       cs_ram   <= 1;
+      done     <= 0;
       phase    <= 0;
     end else begin
       done <= 0;
@@ -97,6 +98,8 @@ module qspi (
             end
           end
         end
+
+        default: state <= IDLE;
       endcase
     end
   end
