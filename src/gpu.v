@@ -328,7 +328,7 @@ module gpu (
       if (dx[10] || dy[10] || col > 7 || row > 7)
         bitmap_px = 0;
       else
-        bitmap_px = bits[{row[2:0], col[2:0]}];
+        bitmap_px = bits[{row[2:0], ~col[2:0]}];   // bit 7 of each row byte is on the left
     end
   endfunction
 
