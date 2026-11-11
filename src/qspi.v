@@ -31,7 +31,10 @@ module qspi (
   reg        phase;       // 0 = about to raise sck, 1 = about to drop it
   reg [2:0]  nbytes;
 
-  assign rdata = rx;
+  // read data comes straight out of the shift register (only looked at when done = 1)
+  assign rdata = (nbytes == 3'd1) ? {24'd0, rx[7:0]} :
+                 (nbytes == 3'd2) ? {16'd0, rx[15:0]} :
+                                    rx;
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -81,6 +84,7 @@ module qspi (
                 mosi  <= 0;
               end else begin
                 // all done
+                done     <= 1;
                 state    <= IDLE;
                 cs_flash <= 1;
                 cs_ram   <= 1;
