@@ -15,6 +15,12 @@ int main(void)
         GPU_SCROLLX = x;
         x += speed;
 
+        // ui_in[0] and [1] move the star by hand
+        if (buttons() & 1)
+            sx -= 4;
+        if (buttons() & 2)
+            sx += 4;
+
         shape(0, sx, sy, 16, STAR, RGB(3, 3, 0));
         sx += dx;
         sy += dy;

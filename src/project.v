@@ -63,6 +63,9 @@ module tt_um_khatam_v (
   wire        io_done = io_req;
   wire        io_wr   = io_req && mem_we;
   reg  [31:0] io_rdata;
+  reg  [7:0]  buttons;
+
+  always @(posedge clk) buttons <= ui_in;
 
   wire [15:0] frame;
   wire [9:0]  line;
@@ -74,6 +77,7 @@ module tt_um_khatam_v (
     case (mem_addr[7:0])
       8'hC0:   io_rdata = {16'd0, frame};
       8'hC4:   io_rdata = {15'd0, vblank, 6'd0, line};
+      8'hD0:   io_rdata = {24'd0, buttons};
       default: io_rdata = 0;
     endcase
   end
@@ -102,6 +106,6 @@ module tt_um_khatam_v (
   assign uio_out = {1'b0, cs_ram, 1'b1, 1'b1, sck, 1'b0, mosi, cs_flash};
   assign uio_oe  = 8'b1111_1011;
 
-  wire _unused = &{ena, ui_in, uio_in[7:3], uio_in[1:0], 1'b0};
+  wire _unused = &{ena, uio_in[7:3], uio_in[1:0], 1'b0};
 
 endmodule

@@ -18,6 +18,7 @@ typedef unsigned char  u8;
 
 #define FRAME          IO(0xC0)
 #define LINE           IO(0xC4)
+#define BUTTONS        IO(0xD0)
 
 #define SHAPE_X(n)     IO(0x40 + 16 * (n))
 #define SHAPE_Y(n)     IO(0x44 + 16 * (n))
@@ -48,6 +49,11 @@ static inline void shape(int n, int x, int y, int size, int kind, int colour)
 static inline void shape_off(int n)
 {
     SHAPE_CTRL(n) = 0;
+}
+
+static inline u32 buttons(void)
+{
+    return BUTTONS;
 }
 
 static inline void wait_vblank(void)
