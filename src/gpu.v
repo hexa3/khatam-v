@@ -51,6 +51,14 @@ module gpu (
   reg [9:0]  scroll_x, scroll_y;
   reg [5:0]  pal0, pal1, pal2, pal3, pal4;
 
+  // 4 shape sprites
+  reg [9:0]  sx [0:3];
+  reg [9:0]  sy [0:3];
+  reg [4:0]  ssize [0:3];
+  reg [1:0]  sshape [0:3];
+  reg        son [0:3];
+  reg [5:0]  scol [0:3];
+
   always @(posedge clk) begin
     if (!rst_n) begin
       pattern    <= 0;
@@ -66,6 +74,7 @@ module gpu (
       pal2 <= 6'b00_00_10;
       pal3 <= 6'b00_00_01;
       pal4 <= 6'b00_10_01;
+      son[0] <= 0; son[1] <= 0; son[2] <= 0; son[3] <= 0;
     end else if (wr) begin
       case (waddr)
         8'h00: begin
@@ -82,7 +91,22 @@ module gpu (
         8'h18: pal2 <= wdata[5:0];
         8'h1C: pal3 <= wdata[5:0];
         8'h20: pal4 <= wdata[5:0];
-        default: ;
+        default: begin
+          // shape sprites 0x40..0x7F
+          if (waddr[7:6] == 2'b01) begin
+            case (waddr[3:2])
+              2'd0: sx[waddr[5:4]] <= wdata[9:0];
+              2'd1: sy[waddr[5:4]] <= wdata[9:0];
+              2'd2: begin
+                ssize[waddr[5:4]]  <= wdata[4:0];
+                sshape[waddr[5:4]] <= wdata[6:5];
+                son[waddr[5:4]]    <= wdata[7];
+                scol[waddr[5:4]]   <= wdata[13:8];
+              end
+              default: ;
+            endcase
+          end
+        end
       endcase
     end
   end
