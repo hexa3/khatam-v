@@ -63,6 +63,7 @@ module tt_um_khatam_v (
   reg  io_done;
   reg  [31:0] io_rdata;
   reg  [7:0]  buttons;
+  wire io_wr = io_req && mem_we && !io_done;
 
   wire [15:0] frame;
   wire [9:0]  line;
@@ -91,9 +92,9 @@ module tt_um_khatam_v (
   gpu gpu0 (
       .clk    (clk),
       .rst_n  (rst_n),
-      .pattern(ui_in[1:0]),
-      .cellsize(ui_in[3:2]),
-      .scroll (ui_in[4]),
+      .wr     (io_wr),
+      .waddr  (mem_addr[7:0]),
+      .wdata  (mem_wdata),
       .rgb    (rgb),
       .hsync  (hsync),
       .vsync  (vsync),

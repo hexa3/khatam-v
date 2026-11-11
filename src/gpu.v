@@ -4,9 +4,9 @@ module gpu (
     input  wire        clk,
     input  wire        rst_n,
 
-    input  wire [1:0]  pattern,    // from the buttons for now
-    input  wire [1:0]  cellsize,
-    input  wire        scroll,
+    input  wire        wr,
+    input  wire [7:0]  waddr,
+    input  wire [31:0] wdata,
 
     output reg  [5:0]  rgb,        // RRGGBB
     output reg         hsync,
@@ -42,9 +42,40 @@ module gpu (
   assign line   = vcount;
   assign vblank = (vcount >= 480);
 
+  // registers (the cpu writes these)
+  reg [1:0]  pattern;
+  reg [1:0]  cellsize;
+  reg        breathe;
+  reg        pattern_on;
+  reg [4:0]  radius;
+  reg [9:0]  scroll_x, scroll_y;
+
+  always @(posedge clk) begin
+    if (!rst_n) begin
+      pattern    <= 0;
+      cellsize   <= 0;
+      breathe    <= 1;
+      pattern_on <= 1;
+      radius     <= 5'd20;
+      scroll_x   <= 0;
+      scroll_y   <= 0;
+    end else if (wr) begin
+      case (waddr)
+        8'h00: begin
+          pattern    <= wdata[1:0];
+          cellsize   <= wdata[3:2];
+          breathe    <= wdata[4];
+          pattern_on <= wdata[5];
+        end
+        8'h04: radius   <= wdata[4:0];
+        8'h08: scroll_x <= wdata[9:0];
+        8'h0C: scroll_y <= wdata[9:0];
+        default: ;
+      endcase
+    end
+  end
+
   // khatam star pattern
-  wire [9:0] scroll_x = scroll ? frame[9:0] : 10'd0;
-  wire [9:0] scroll_y = 0;
   wire [9:0] x = hcount + scroll_x;
   wire [9:0] y = vcount + scroll_y;
 
@@ -77,7 +108,7 @@ module gpu (
 
   // breathing: radius goes up and down with the frame counter
   wire [6:0] tri_wave = frame[7] ? ~frame[6:0] : frame[6:0];
-  wire [4:0] r   = 5'd16 + tri_wave[6:4];
+  wire [4:0] r   = breathe ? (5'd16 + tri_wave[6:4]) : radius;
   wire [4:0] r3  = r - 5'd3;
   wire [4:0] rs  = (r >> 2) + 5'd3;
   wire [4:0] ro  = (r > 5'd23) ? 5'd31 : r + 5'd8;
