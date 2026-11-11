@@ -32,6 +32,32 @@ module tt_um_khatam_v (
       .mem_done (mem_done)
   );
 
+  wire is_io  = mem_addr[25];
+  wire is_ram = mem_addr[24];
+
+  // ---------------- flash + PSRAM ----------------
+  wire [31:0] spi_rdata;
+  wire        spi_done;
+  wire        sck, mosi, cs_flash, cs_ram;
+
+  qspi spi0 (
+      .clk     (clk),
+      .rst_n   (rst_n),
+      .req     (mem_req && !is_io),
+      .we      (mem_we),
+      .ram     (is_ram),
+      .addr    (mem_addr[23:0]),
+      .wdata   (mem_wdata),
+      .size    (mem_size),
+      .rdata   (spi_rdata),
+      .done    (spi_done),
+      .sck     (sck),
+      .mosi    (mosi),
+      .miso    (uio_in[2]),
+      .cs_flash(cs_flash),
+      .cs_ram  (cs_ram)
+  );
+
   wire [5:0] rgb;
   wire       hsync, vsync;
 
@@ -46,16 +72,15 @@ module tt_um_khatam_v (
       .vsync  (vsync)
   );
 
-  // no memory yet, feed it nops
-  assign mem_rdata = 32'h00000013;
-  assign mem_done  = 1;
+  assign mem_rdata = spi_rdata;
+  assign mem_done  = spi_done;
 
   // TinyVGA pmod: rgb = {R1, R0, G1, G0, B1, B0}
   assign uo_out = {hsync, rgb[0], rgb[2], rgb[4], vsync, rgb[1], rgb[3], rgb[5]};
 
-  assign uio_out = 0;
-  assign uio_oe  = 0;
+  assign uio_out = {1'b0, cs_ram, 1'b1, 1'b1, sck, 1'b0, mosi, cs_flash};
+  assign uio_oe  = 8'b1111_1011;
 
-  wire _unused = &{ena, ui_in[7:5], uio_in, mem_addr, mem_wdata, mem_size, mem_we, mem_req, 1'b0};
+  wire _unused = &{ena, ui_in[7:5], uio_in[7:3], uio_in[1:0], 1'b0};
 
 endmodule
