@@ -37,8 +37,8 @@ module qspi (
 
   // read data comes straight out of the shift register (only looked at when done = 1)
   assign rdata = (nbytes == 3'd1) ? {24'd0, rx[7:0]} :
-                 (nbytes == 3'd2) ? {16'd0, rx[15:0]} :
-                                    rx;
+                 (nbytes == 3'd2) ? {16'd0, rx[7:0], rx[15:8]} :
+                                    {rx[7:0], rx[15:8], rx[23:16], rx[31:24]};
 
   always @(posedge clk) begin
     if (!rst_n) begin
