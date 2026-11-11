@@ -59,6 +59,12 @@ module gpu (
   reg        son [0:3];
   reg [5:0]  scol [0:3];
 
+  reg [9:0]  bx0, by0;
+  reg [1:0]  bscale0;
+  reg        bon0;
+  reg [5:0]  bcol0;
+  reg [63:0] bbits0;
+
   always @(posedge clk) begin
     if (!rst_n) begin
       pattern    <= 0;
@@ -75,6 +81,7 @@ module gpu (
       pal3 <= 6'b00_00_01;
       pal4 <= 6'b00_10_01;
       son[0] <= 0; son[1] <= 0; son[2] <= 0; son[3] <= 0;
+      bon0 <= 0;
     end else if (wr) begin
       case (waddr)
         8'h00: begin
@@ -91,6 +98,15 @@ module gpu (
         8'h18: pal2 <= wdata[5:0];
         8'h1C: pal3 <= wdata[5:0];
         8'h20: pal4 <= wdata[5:0];
+        8'h80: bx0 <= wdata[9:0];
+        8'h84: by0 <= wdata[9:0];
+        8'h88: begin
+          bscale0 <= wdata[1:0];
+          bon0    <= wdata[7];
+          bcol0   <= wdata[13:8];
+        end
+        8'h8C: bbits0[31:0]  <= wdata;
+        8'h90: bbits0[63:32] <= wdata;
         default: begin
           // shape sprites 0x40..0x7F
           if (waddr[7:6] == 2'b01) begin
@@ -289,9 +305,32 @@ module gpu (
     end
   endfunction
 
+  // ================= bitmap sprite =================
+  // 8x8 picture, 1 bit per pixel, scaled up 1x/2x/4x/8x. x/y is the top left
+  function bitmap_px;
+    input [9:0]  h, v, x0, y0;
+    input [1:0]  scale;
+    input [63:0] bits;
+    reg   [10:0] dx, dy;
+    reg   [9:0]  col, row;
+    begin
+      dx  = {1'b0, h} - {1'b0, x0};
+      dy  = {1'b0, v} - {1'b0, y0};
+      col = dx[9:0] >> scale;
+      row = dy[9:0] >> scale;
+      if (dx[10] || dy[10] || col > 7 || row > 7)
+        bitmap_px = 0;
+      else
+        bitmap_px = bits[{row[2:0], col[2:0]}];
+    end
+  endfunction
+
+  wire bm0 = bon0 && bitmap_px(hcount, vcount, bx0, by0, bscale0, bbits0);
+
   reg [5:0] color;
   always @(*) begin
-    if (shape_hit[0])      color = scol[0];
+    if (bm0)               color = bcol0;
+    else if (shape_hit[0]) color = scol[0];
     else if (shape_hit[1]) color = scol[1];
     else if (shape_hit[2]) color = scol[2];
     else if (shape_hit[3]) color = scol[3];
