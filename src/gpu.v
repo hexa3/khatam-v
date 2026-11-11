@@ -246,13 +246,47 @@ module gpu (
     endcase
   end
 
+  // shape sprites
+  function in_shape;
+    input [9:0] h, v, cx_, cy_;
+    input [4:0] sz;
+    input [1:0] shp;
+    reg   [10:0] dx, dy;
+    reg   [9:0]  adx, ady;
+    begin
+      dx  = {1'b0, h} - {1'b0, cx_};
+      dy  = {1'b0, v} - {1'b0, cy_};
+      adx = dx[10] ? -dx[9:0] : dx[9:0];
+      ady = dy[10] ? -dy[9:0] : dy[9:0];
+      if (adx > 31 || ady > 31)
+        in_shape = 0;
+      else
+        in_shape = (adx[4:0] <= sz) && (ady[4:0] <= sz);   // square
+    end
+  endfunction
+
+  wire shape_hit0 = son[0] && in_shape(hcount, vcount, sx[0], sy[0], ssize[0], sshape[0]);
+  wire shape_hit1 = son[1] && in_shape(hcount, vcount, sx[1], sy[1], ssize[1], sshape[1]);
+  wire shape_hit2 = son[2] && in_shape(hcount, vcount, sx[2], sy[2], ssize[2], sshape[2]);
+  wire shape_hit3 = son[3] && in_shape(hcount, vcount, sx[3], sy[3], ssize[3], sshape[3]);
+
+  // sprites go on top of the background
+  reg [5:0] color;
+  always @(*) begin
+    if (shape_hit0)      color = scol[0];
+    else if (shape_hit1) color = scol[1];
+    else if (shape_hit2) color = scol[2];
+    else if (shape_hit3) color = scol[3];
+    else                 color = bg_color;
+  end
+
   always @(posedge clk) begin
     if (!rst_n) begin
       rgb   <= 0;
       hsync <= 1;
       vsync <= 1;
     end else begin
-      rgb   <= visible ? bg_color : 6'd0;
+      rgb   <= visible ? color : 6'd0;
       hsync <= ~((hcount >= 656) && (hcount < 752));
       vsync <= ~((vcount >= 490) && (vcount < 492));
     end
