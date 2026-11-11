@@ -49,6 +49,7 @@ module gpu (
   reg        pattern_on;
   reg [4:0]  radius;
   reg [9:0]  scroll_x, scroll_y;
+  reg [5:0]  pal0, pal1, pal2, pal3, pal4;
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -59,6 +60,12 @@ module gpu (
       radius     <= 5'd20;
       scroll_x   <= 0;
       scroll_y   <= 0;
+      // boot up in the Fez colours so you see something straight away
+      pal0 <= 6'b11_11_11;
+      pal1 <= 6'b00_01_11;
+      pal2 <= 6'b00_00_10;
+      pal3 <= 6'b00_00_01;
+      pal4 <= 6'b00_10_01;
     end else if (wr) begin
       case (waddr)
         8'h00: begin
@@ -70,6 +77,11 @@ module gpu (
         8'h04: radius   <= wdata[4:0];
         8'h08: scroll_x <= wdata[9:0];
         8'h0C: scroll_y <= wdata[9:0];
+        8'h10: pal0 <= wdata[5:0];
+        8'h14: pal1 <= wdata[5:0];
+        8'h18: pal2 <= wdata[5:0];
+        8'h1C: pal3 <= wdata[5:0];
+        8'h20: pal4 <= wdata[5:0];
         default: ;
       endcase
     end
@@ -198,14 +210,15 @@ module gpu (
   wire [1:0] cy2  = on_b ? cy + py[5] : cy;
   wire [1:0] band = cx2 + cy2 - frame[6:5];
 
-  reg [5:0] color;
+  reg [5:0] bg_color;
   always @(*) begin
-    case (kind)
-      FILL:    color = band[1] ? 6'b00_00_10 : 6'b00_01_11;
-      FILL2:   color = band[1] ? 6'b00_01_11 : 6'b00_00_10;
-      LINE:    color = 6'b00_00_01;
-      ACCENT:  color = 6'b00_10_01;
-      default: color = 6'b11_11_11;
+    if (!pattern_on) bg_color = pal0;
+    else case (kind)
+      FILL:    bg_color = band[1] ? pal2 : pal1;
+      FILL2:   bg_color = band[1] ? pal1 : pal2;
+      LINE:    bg_color = pal3;
+      ACCENT:  bg_color = pal4;
+      default: bg_color = pal0;
     endcase
   end
 
@@ -215,7 +228,7 @@ module gpu (
       hsync <= 1;
       vsync <= 1;
     end else begin
-      rgb   <= visible ? color : 6'd0;
+      rgb   <= visible ? bg_color : 6'd0;
       hsync <= ~((hcount >= 656) && (hcount < 752));
       vsync <= ~((vcount >= 490) && (vcount < 492));
     end
