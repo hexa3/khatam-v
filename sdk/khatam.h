@@ -92,4 +92,6 @@ static inline u32 buttons(void)
     return BUTTONS;
 }
 
+void sound_off(void);
+
 #endif

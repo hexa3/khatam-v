@@ -20,3 +20,8 @@ u32 __umodsi3(u32 n, u32 d)
 {
     return n - __udivsi3(n, d) * d;
 }
+
+void sound_off(void)
+{
+    SND_VOLUME = 0;
+}
