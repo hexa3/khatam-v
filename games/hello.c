@@ -12,6 +12,7 @@ int main(void)
 
     bitmap(0, 300, 40, 3, RGB(3, 3, 3), letter);
     SND_VOICE0 = NOTE(440);   // A
+    SND_VOLUME = 6;
 
     int x = 0;
     int sx = 100, sy = 100, dx = 3, dy = 2;

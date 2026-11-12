@@ -17,6 +17,9 @@ typedef unsigned char  u8;
 #define GPU_PAL(n)     IO(0x10 + 4 * (n))
 
 #define SND_VOICE0     IO(0xE0)
+#define SND_VOICE1     IO(0xE4)
+#define SND_NOISE      IO(0xE8)
+#define SND_VOLUME     IO(0xEC)
 
 #define FRAME          IO(0xC0)
 #define LINE           IO(0xC4)
