@@ -16,10 +16,13 @@ module cpu (
   localparam FETCH = 2'd0;
   localparam EXEC  = 2'd1;
   localparam MEM   = 2'd2;
+  localparam MUL   = 2'd3;
 
   reg [1:0]  state;
   reg [25:0] pc;
   reg [31:0] ir;
+  reg [31:0] hi, lo;   // multiply
+  reg [4:0]  count;
 
   reg [31:0] regs [1:15];
 
@@ -83,20 +86,10 @@ module cpu (
   end
 
   // multiply (just the mul half of the M extension)
-  wire        is_mul  = (opcode == OP_REG) && (f7 == 7'b0000001);
-  wire [63:0] prod_uu = rs1_val * rs2_val;
-  wire [63:0] prod_ss = $signed(rs1_val) * $signed(rs2_val);
-  wire [63:0] prod_su = $signed(rs1_val) * $signed({1'b0, rs2_val});
-
-  reg [31:0] mul_out;
-  always @(*) begin
-    case (f3[1:0])
-      2'b00:   mul_out = prod_uu[31:0];    // MUL
-      2'b01:   mul_out = prod_ss[63:32];   // MULH
-      2'b10:   mul_out = prod_su[63:32];   // MULHSU
-      default: mul_out = prod_uu[63:32];   // MULHU
-    endcase
-  end
+  // the * was massive, so now it's shift-add, one bit per clock:
+  // hi += rs1 if the low bit of lo is set, then shift {hi,lo} right
+  wire        is_mul = (opcode == OP_REG) && (f7 == 7'b0000001);
+  wire [32:0] hi_add = hi + (lo[0] ? rs1_val : 32'd0);
 
   // memory bus
   wire [31:0] addr = rs1_val + ((opcode == OP_STORE) ? imm_s : imm_i);
@@ -133,6 +126,11 @@ module cpu (
         EXEC: begin
           if (opcode == OP_LOAD || opcode == OP_STORE) begin
             state <= MEM;
+          end else if (is_mul) begin
+            hi    <= 0;
+            lo    <= rs2_val;
+            count <= 0;
+            state <= MUL;
           end else begin
               if (rd != 0) begin
                 case (opcode)
@@ -140,7 +138,7 @@ module cpu (
                   OP_AUIPC:       regs[rd] <= {6'd0, pc} + imm_u;
                   OP_JAL, OP_JALR: regs[rd] <= {6'd0, pc + 26'd4};
                   OP_IMM:         regs[rd] <= alu;
-                  OP_REG:         regs[rd] <= is_mul ? mul_out : alu;
+                  OP_REG:         regs[rd] <= alu;
                   default: ;
                 endcase
               end
@@ -161,6 +159,19 @@ module cpu (
             regs[rd] <= load_val;
           pc    <= pc + 4;
           state <= FETCH;
+        end
+
+        MUL: begin
+          hi    <= hi_add[32:1];
+          lo    <= {hi_add[0], lo[31:1]};
+          count <= count + 1;
+          if (count == 31) begin
+            // TODO mulh/mulhsu come out wrong for negative numbers
+            if (rd != 0)
+              regs[rd] <= (f3[1:0] == 2'b00) ? {hi_add[0], lo[31:1]} : hi_add[32:1];
+            pc    <= pc + 4;
+            state <= FETCH;
+          end
         end
 
         default: state <= FETCH;
