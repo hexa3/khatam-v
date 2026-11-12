@@ -71,6 +71,7 @@ module tt_um_khatam_v (
   wire [11:0] collide;
   wire [5:0]  rgb;
   wire        hsync, vsync;
+  wire        audio_out;
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -94,7 +95,7 @@ module tt_um_khatam_v (
   gpu gpu0 (
       .clk    (clk),
       .rst_n  (rst_n),
-      .wr     (io_wr),
+      .wr     (io_wr && mem_addr[7:5] != 3'b111),   // everything below 0xE0
       .waddr  (mem_addr[7:0]),
       .wdata  (mem_wdata),
       .rgb    (rgb),
@@ -106,6 +107,15 @@ module tt_um_khatam_v (
       .collide(collide)
   );
 
+  audio audio0 (
+      .clk  (clk),
+      .rst_n(rst_n),
+      .wr   (io_wr && mem_addr[7:4] == 4'hE),
+      .waddr(mem_addr[3:0]),
+      .wdata(mem_wdata),
+      .pwm  (audio_out)
+  );
+
   assign mem_rdata = is_io ? io_rdata : spi_rdata;
   assign mem_done  = is_io ? io_done  : spi_done;
 
@@ -113,7 +123,7 @@ module tt_um_khatam_v (
   // TinyVGA pmod: rgb = {R1, R0, G1, G0, B1, B0}
   assign uo_out = {hsync, rgb[0], rgb[2], rgb[4], vsync, rgb[1], rgb[3], rgb[5]};
 
-  assign uio_out = {1'b0, cs_ram, 1'b1, 1'b1, sck, 1'b0, mosi, cs_flash};
+  assign uio_out = {audio_out, cs_ram, 1'b1, 1'b1, sck, 1'b0, mosi, cs_flash};
   assign uio_oe  = rst_n ? 8'b1111_1011 : 8'b0000_0000;
 
   wire _unused = &{ena, uio_in[7:3], uio_in[1:0], 1'b0};
