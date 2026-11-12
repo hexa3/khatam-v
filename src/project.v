@@ -68,6 +68,7 @@ module tt_um_khatam_v (
   wire [15:0] frame;
   wire [9:0]  line;
   wire        vblank;
+  wire [11:0] collide;
   wire [5:0]  rgb;
   wire        hsync, vsync;
 
@@ -84,6 +85,7 @@ module tt_um_khatam_v (
     case (mem_addr[7:0])
       8'hC0:   io_rdata = {16'd0, frame};
       8'hC4:   io_rdata = {15'd0, vblank, 6'd0, line};
+      8'hC8:   io_rdata = {20'd0, collide};
       8'hD0:   io_rdata = {24'd0, buttons};
       default: io_rdata = 0;
     endcase
@@ -100,7 +102,8 @@ module tt_um_khatam_v (
       .vsync  (vsync),
       .frame  (frame),
       .line   (line),
-      .vblank (vblank)
+      .vblank (vblank),
+      .collide(collide)
   );
 
   assign mem_rdata = is_io ? io_rdata : spi_rdata;
