@@ -2,11 +2,22 @@
 
 #include "khatam.h"
 
+static const u8 lantern[8] = {
+    0x18, // ...##...
+    0x3c, // ..####..
+    0x7e, // .######.
+    0xdb, // ##.##.##
+    0xff, // ########
+    0x7e, // .######.
+    0x3c, // ..####..
+    0x18, // ...##...
+};
+
 struct faller {
     int x, y, speed;
 };
 
-static struct faller stuff[3];
+static struct faller stuff[4];
 static int px = 304;
 
 static u32 seed = 12345;
@@ -29,7 +40,7 @@ static void new_star(int i)
 int main(void)
 {
     background(0, 0, 1);
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 4; i++) {
         new_star(i);
         stuff[i].y = -(i * 120);   // spread them out at the start
     }
@@ -44,17 +55,17 @@ int main(void)
             px -= 6;
         if ((b & 2) && px < 640)
             px += 6;
-        shape(0, px, 420, 16, SQUARE, 0x38);
+        bitmap(0, px, 420, 2, 0x38, lantern);
 
-        // move the stars (shape 0 is the player so they use 1-3)
-        for (int i = 0; i < 3; i++) {
+        // move the stars
+        for (int i = 0; i < 4; i++) {
             stuff[i].y += stuff[i].speed;
             if (stuff[i].y > 496)
                 new_star(i);
             if (stuff[i].y >= 0)
-                shape(i + 1, stuff[i].x, stuff[i].y, 16, STAR, 0x3c);
+                shape(i, stuff[i].x, stuff[i].y, 16, STAR, 0x3c);
             else
-                shape_off(i + 1);
+                shape_off(i);
         }
 
         // slowly drift the background
