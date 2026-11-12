@@ -13,12 +13,14 @@ SECTIONS
     *(.text*)
     *(.rodata*)
     *(.srodata*)
+    . = ALIGN(4);
   } > FLASH
 
   .data : {
     _data_start = .;
     *(.data*)
     *(.sdata*)
+    . = ALIGN(4);
     _data_end = .;
   } > RAM AT > FLASH
   _data_load = LOADADDR(.data);
@@ -28,6 +30,7 @@ SECTIONS
     *(.bss*)
     *(.sbss*)
     *(COMMON)
+    . = ALIGN(4);
     _bss_end = .;
   } > RAM
 
