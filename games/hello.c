@@ -11,6 +11,7 @@ int main(void)
     GPU_PATTERN = INTERLACED | (1 << 4) | (1 << 5);
 
     bitmap(0, 300, 40, 3, RGB(3, 3, 3), letter);
+    SND_VOICE0 = NOTE(440);   // A
 
     int x = 0;
     int sx = 100, sy = 100, dx = 3, dy = 2;
