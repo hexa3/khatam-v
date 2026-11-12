@@ -14,7 +14,8 @@ module gpu (
 
     output reg  [15:0] frame,
     output wire [9:0]  line,
-    output wire        vblank
+    output wire        vblank,
+    output reg  [11:0] collide     // [5:0] sprite hit a line, [11:6] sprite hit a sprite
 );
 
   // VGA timing 640x480
@@ -66,6 +67,8 @@ module gpu (
   reg        bon [0:1];
   reg [5:0]  bcol [0:1];
   reg [63:0] bbits [0:1];
+
+  wire clear_collide = wr && (waddr == 8'hC8);
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -270,6 +273,8 @@ module gpu (
     endcase
   end
 
+  wire bg_line = pattern_on && (kind == LINE);
+
   // shape sprites
   function in_shape;
     input [9:0] h, v, cx_, cy_;
@@ -334,6 +339,19 @@ module gpu (
     else if (shape_hit2) color = scol[2];
     else if (shape_hit3) color = scol[3];
     else                 color = bg_color;
+  end
+
+  // collisions: which sprites are on this pixel, and is there more than one
+  wire [5:0] here = {bm1, bm0, shape_hit3, shape_hit2, shape_hit1, shape_hit0};
+  wire       crowd = (here & (here - 6'd1)) != 0;
+
+  always @(posedge clk) begin
+    if (!rst_n || clear_collide) begin
+      collide <= 0;
+    end else if (visible) begin
+      if (bg_line) collide[5:0]  <= collide[5:0]  | here;
+      if (crowd)   collide[11:6] <= collide[11:6] | here;
+    end
   end
 
   always @(posedge clk) begin
