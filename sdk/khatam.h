@@ -31,6 +31,12 @@ typedef unsigned char  u8;
 #define COLLIDE        IO(0xC8)
 #define BUTTONS        IO(0xD0)
 
+// ---------------- sound ----------------
+#define SND_VOICE0     IO(0xE0)
+#define SND_VOICE1     IO(0xE4)
+#define SND_NOISE      IO(0xE8)
+#define SND_VOLUME     IO(0xEC)
+
 // shapes
 #define SQUARE      0
 #define DIAMOND     1
@@ -44,6 +50,9 @@ typedef unsigned char  u8;
 
 // colour from 0-3 per channel
 #define RGB(r, g, b) (((r) << 4) | ((g) << 2) | (b))
+
+// note period for the sound registers (freq in Hz)
+#define NOTE(hz) (25000000 / 128 / (hz))
 
 static inline void background(int pattern, int cell, int breathe)
 {
