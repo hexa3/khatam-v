@@ -16,7 +16,7 @@ module audio (
   reg [14:0] lfsr;
   reg [11:0] volume;
   reg [5:0]  pre;      // prescaler, ticks every 64 clocks
-  reg [4:0]  pwm_cnt;
+  reg [5:0]  pwm_cnt;
 
   wire tick = (pre == 0);
 
@@ -62,8 +62,8 @@ module audio (
     end
   end
 
-  // mix the voices and make it a pwm
-  wire [4:0] mix = (sq0 ? volume[3:0] : 4'd0)
+  // mix: max is 15+15+15 = 45 out of 63
+  wire [5:0] mix = (sq0 ? volume[3:0] : 4'd0)
                  + (sq1 ? volume[7:4] : 4'd0)
                  + (lfsr[0] ? volume[11:8] : 4'd0);
 
