@@ -302,10 +302,34 @@ module gpu (
   wire shape_hit2 = son[2] && in_shape(hcount, vcount, sx[2], sy[2], ssize[2], sshape[2]);
   wire shape_hit3 = son[3] && in_shape(hcount, vcount, sx[3], sy[3], ssize[3], sshape[3]);
 
-  // sprites go on top of the background
+  // bitmap sprites
+  function bitmap_px;
+    input [9:0]  h, v, x0, y0;
+    input [1:0]  scale;
+    input [63:0] bits;
+    reg   [10:0] dx, dy;
+    reg   [9:0]  col, row;
+    begin
+      dx  = {1'b0, h} - {1'b0, x0};
+      dy  = {1'b0, v} - {1'b0, y0};
+      col = dx[9:0] >> scale;
+      row = dy[9:0] >> scale;
+      if (dx[10] || dy[10] || col > 7 || row > 7)
+        bitmap_px = 0;
+      else
+        bitmap_px = bits[{row[2:0], ~col[2:0]}];   // bit 7 of each row byte is on the left
+    end
+  endfunction
+
+  wire bm0 = bon[0] && bitmap_px(hcount, vcount, bx[0], by[0], bscale[0], bbits[0]);
+  wire bm1 = bon[1] && bitmap_px(hcount, vcount, bx[1], by[1], bscale[1], bbits[1]);
+
+  // sprites go on top of the background, bitmaps on top of shapes
   reg [5:0] color;
   always @(*) begin
-    if (shape_hit0)      color = scol[0];
+    if (bm0)             color = bcol[0];
+    else if (bm1)        color = bcol[1];
+    else if (shape_hit0) color = scol[0];
     else if (shape_hit1) color = scol[1];
     else if (shape_hit2) color = scol[2];
     else if (shape_hit3) color = scol[3];
