@@ -1,4 +1,8 @@
-# build hello for the chip
+# build a game into a flash image
+#   make                -> build/hello.bin (write this to the flash at address 0)
+#   make GAME=mygame    -> games/mygame.c
+
+GAME ?= hello
 
 CC      = clang
 LD      = ld.lld
@@ -6,9 +10,9 @@ OBJCOPY = llvm-objcopy
 
 CFLAGS = --target=riscv32-unknown-elf -march=rv32e -mabi=ilp32e -Os -ffreestanding -nostdlib -mno-relax -Wall -Isdk
 
-all: build/hello.bin build/hello.hex
+all: build/$(GAME).bin build/$(GAME).hex
 
-build/hello.o: games/hello.c sdk/khatam.h
+build/%.o: games/%.c sdk/khatam.h
 	mkdir -p build
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -16,14 +20,14 @@ build/crt0.o: sdk/crt0.S
 	mkdir -p build
 	$(CC) $(CFLAGS) -c $< -o $@
 
-build/hello.elf: build/crt0.o build/hello.o sdk/link.ld
-	$(LD) -T sdk/link.ld build/crt0.o build/hello.o -o $@
+build/$(GAME).elf: build/crt0.o build/$(GAME).o sdk/link.ld
+	$(LD) -T sdk/link.ld build/crt0.o build/$(GAME).o -o $@
 
-build/hello.bin: build/hello.elf
+build/$(GAME).bin: build/$(GAME).elf
 	$(OBJCOPY) -O binary $< $@
 
 # one byte per line, for $$readmemh in the FPGA build
-build/hello.hex: build/hello.bin
+build/$(GAME).hex: build/$(GAME).bin
 	od -An -tx1 -v $< | tr -s ' ' '\n' | sed '/^$$/d' > $@
 
 clean:
