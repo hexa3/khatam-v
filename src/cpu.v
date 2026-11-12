@@ -13,12 +13,15 @@ module cpu (
     input  wire        mem_done
 );
 
-  localparam FETCH = 2'd0;
-  localparam EXEC  = 2'd1;
-  localparam MEM   = 2'd2;
-  localparam MUL   = 2'd3;
+  localparam FETCH = 3'd0;
+  localparam EXEC  = 3'd1;
+  localparam MEM   = 3'd2;
+  localparam MUL   = 3'd3;
+  localparam FIX0  = 3'd4;
+  localparam FIX1  = 3'd5;
+  localparam FIX2  = 3'd6;
 
-  reg [1:0]  state;
+  reg [2:0]  state;
   reg [25:0] pc;
   reg [31:0] ir;
   reg [31:0] hi, lo;   // multiply
@@ -88,6 +91,9 @@ module cpu (
   // multiply (just the mul half of the M extension)
   // the * was massive, so now it's shift-add, one bit per clock:
   // hi += rs1 if the low bit of lo is set, then shift {hi,lo} right
+  // that's an unsigned multiply. for MULH/MULHSU the top half gets fixed after:
+  // FIX0: hi -= rs2 if rs1 was negative    (MULH, MULHSU)
+  // FIX1: hi -= rs1 if rs2 was negative    (MULH)
   wire        is_mul = (opcode == OP_REG) && (f7 == 7'b0000001);
   wire [32:0] hi_add = hi + (lo[0] ? rs1_val : 32'd0);
 
@@ -166,12 +172,34 @@ module cpu (
           lo    <= {hi_add[0], lo[31:1]};
           count <= count + 1;
           if (count == 31) begin
-            // TODO mulh/mulhsu come out wrong for negative numbers
-            if (rd != 0)
-              regs[rd] <= (f3[1:0] == 2'b00) ? {hi_add[0], lo[31:1]} : hi_add[32:1];
-            pc    <= pc + 4;
-            state <= FETCH;
+            if (f3[1:0] == 2'b00) begin   // MUL wants lo, it's done
+              if (rd != 0)
+                regs[rd] <= {hi_add[0], lo[31:1]};
+              pc    <= pc + 4;
+              state <= FETCH;
+            end else begin
+              state <= FIX0;
+            end
           end
+        end
+
+        FIX0: begin
+          if (rs1_val[31] && (f3[1:0] == 2'b01 || f3[1:0] == 2'b10))
+            hi <= hi - rs2_val;
+          state <= FIX1;
+        end
+
+        FIX1: begin
+          if (rs2_val[31] && f3[1:0] == 2'b01)
+            hi <= hi - rs1_val;
+          state <= FIX2;
+        end
+
+        FIX2: begin
+          if (rd != 0)
+            regs[rd] <= hi;
+          pc    <= pc + 4;
+          state <= FETCH;
         end
 
         default: state <= FETCH;
