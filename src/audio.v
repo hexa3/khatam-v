@@ -31,7 +31,7 @@ module audio (
       cnt2    <= 0;
       sq0     <= 0;
       sq1     <= 0;
-      lfsr    <= 0;
+      lfsr    <= 15'h1;
       pre     <= 0;
     end else begin
       pre <= pre + 1;
