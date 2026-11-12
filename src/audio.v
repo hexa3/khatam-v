@@ -15,6 +15,7 @@ module audio (
   reg [14:0] lfsr;
   reg [11:0] volume;
   reg [5:0]  pre;      // prescaler, ticks every 64 clocks
+  reg [4:0]  pwm_cnt;
 
   wire tick = (pre == 0);
 
@@ -57,12 +58,19 @@ module audio (
     end
   end
 
-  // volume is just on/off for now, TODO proper mixing
+  // mix: max is 15+15+15 = 45
+  wire [5:0] mix = (sq0 ? volume[3:0] : 4'd0)
+                 + (sq1 ? volume[7:4] : 4'd0)
+                 + (lfsr[0] ? volume[11:8] : 4'd0);
+
   always @(posedge clk) begin
-    if (!rst_n)
-      pwm <= 0;
-    else
-      pwm <= (sq0 && volume[3:0] != 0) ^ (sq1 && volume[7:4] != 0) ^ (lfsr[0] && volume[11:8] != 0);
+    if (!rst_n) begin
+      pwm_cnt <= 0;
+      pwm     <= 0;
+    end else begin
+      pwm_cnt <= pwm_cnt + 1;
+      pwm     <= (pwm_cnt < mix);
+    end
   end
 
 endmodule
