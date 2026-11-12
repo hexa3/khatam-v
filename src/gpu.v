@@ -276,6 +276,13 @@ module gpu (
   wire bg_line = pattern_on && (kind == LINE);
 
   // shape sprites
+  reg [3:0] shape_hit;
+  integer i;
+  always @(*) begin
+    for (i = 0; i < 4; i = i + 1)
+      shape_hit[i] = son[i] && in_shape(hcount, vcount, sx[i], sy[i], ssize[i], sshape[i]);
+  end
+
   function in_shape;
     input [9:0] h, v, cx_, cy_;
     input [4:0] sz;
@@ -302,11 +309,6 @@ module gpu (
     end
   endfunction
 
-  wire shape_hit0 = son[0] && in_shape(hcount, vcount, sx[0], sy[0], ssize[0], sshape[0]);
-  wire shape_hit1 = son[1] && in_shape(hcount, vcount, sx[1], sy[1], ssize[1], sshape[1]);
-  wire shape_hit2 = son[2] && in_shape(hcount, vcount, sx[2], sy[2], ssize[2], sshape[2]);
-  wire shape_hit3 = son[3] && in_shape(hcount, vcount, sx[3], sy[3], ssize[3], sshape[3]);
-
   // bitmap sprites
   function bitmap_px;
     input [9:0]  h, v, x0, y0;
@@ -332,17 +334,17 @@ module gpu (
   // sprites go on top of the background, bitmaps on top of shapes
   reg [5:0] color;
   always @(*) begin
-    if (bm0)             color = bcol[0];
-    else if (bm1)        color = bcol[1];
-    else if (shape_hit0) color = scol[0];
-    else if (shape_hit1) color = scol[1];
-    else if (shape_hit2) color = scol[2];
-    else if (shape_hit3) color = scol[3];
-    else                 color = bg_color;
+    if (bm0)               color = bcol[0];
+    else if (bm1)          color = bcol[1];
+    else if (shape_hit[0]) color = scol[0];
+    else if (shape_hit[1]) color = scol[1];
+    else if (shape_hit[2]) color = scol[2];
+    else if (shape_hit[3]) color = scol[3];
+    else                   color = bg_color;
   end
 
   // collisions: which sprites are on this pixel, and is there more than one
-  wire [5:0] here = {bm1, bm0, shape_hit3, shape_hit2, shape_hit1, shape_hit0};
+  wire [5:0] here = {bm1, bm0, shape_hit};
   wire       crowd = (here & (here - 6'd1)) != 0;
 
   always @(posedge clk) begin
