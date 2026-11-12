@@ -126,7 +126,6 @@ module cpu (
       case (state)
 
         FETCH: if (mem_done) begin
-          $display("pc=%h ir=%h", pc, mem_rdata);
           ir    <= mem_rdata;
           state <= EXEC;
         end
