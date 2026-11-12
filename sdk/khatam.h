@@ -20,6 +20,12 @@ typedef unsigned char  u8;
 #define SHAPE_Y(n)     IO(0x44 + 16 * n)
 #define SHAPE_CTRL(n)  IO(0x48 + 16 * n)
 
+#define BITMAP_X(n)    IO(0x80 + 32 * n)
+#define BITMAP_Y(n)    IO(0x84 + 32 * n)
+#define BITMAP_CTRL(n) IO(0x88 + 32 * n)
+#define BITMAP_LO(n)   IO(0x8C + 32 * n)
+#define BITMAP_HI(n)   IO(0x90 + 32 * n)
+
 #define FRAME          IO(0xC0)
 #define LINE           IO(0xC4)
 #define BUTTONS        IO(0xD0)
@@ -45,6 +51,15 @@ static inline void shape(int n, int x, int y, int size, int kind, int colour)
 static inline void shape_off(int n)
 {
     SHAPE_CTRL(n) = 0;
+}
+
+static inline void bitmap(int n, int x, int y, int scale, int colour, const u8 *rows)
+{
+    BITMAP_X(n) = x;
+    BITMAP_Y(n) = y;
+    BITMAP_LO(n) = rows[0] | (rows[1] << 8) | (rows[2] << 16) | (rows[3] << 24);
+    BITMAP_HI(n) = rows[4] | (rows[5] << 8) | (rows[6] << 16) | (rows[7] << 24);
+    BITMAP_CTRL(n) = scale | (1 << 7) | (colour << 8);
 }
 
 static inline void wait_vblank(void)
