@@ -4,6 +4,7 @@
 module top (
     input  wire       clk,       // 50 MHz
     input  wire [1:0] button,    // active low
+    output wire       audio,
     output wire [3:0] gpdi_dp
 );
 
@@ -49,6 +50,8 @@ module top (
 
   spi_bram #(.WRITABLE(1)) psram (
       .clk(clk_pix), .cs_n(uio_out[6]), .sck(uio_out[3]), .mosi(uio_out[1]), .miso(miso_ram));
+
+  assign audio = uio_out[7];
 
   // ---------------- VGA -> HDMI ----------------
   wire [1:0] red   = {uo_out[0], uo_out[4]};

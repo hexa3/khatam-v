@@ -24,3 +24,7 @@ LOCATE COMP "gpdi_dp[2]" SITE "P16";
 IOBUF  PORT "gpdi_dp[2]" IO_TYPE=LVCMOS33D DRIVE=4;
 LOCATE COMP "gpdi_dp[3]" SITE "R12";
 IOBUF  PORT "gpdi_dp[3]" IO_TYPE=LVCMOS33D DRIVE=4;
+
+# sound out, header pin 12
+LOCATE COMP "audio" SITE "N4";
+IOBUF  PORT "audio" IO_TYPE=LVCMOS33 DRIVE=8;
