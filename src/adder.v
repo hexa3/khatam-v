@@ -1,4 +1,19 @@
-// 32 bit Kogge-Stone adder
+/*
+ * 32 bit Kogge-Stone adder
+ *
+ * A normal "+" turns into a ripple carry adder, which on GF180 at the slow
+ * corner is ~20ns for 32 bits, half the clock. (I tried a carry-select adder
+ * first but yosys is clever and merged it straight back into a ripple.)
+ *
+ * Kogge-Stone works out every carry in log2(32) = 5 steps instead of 32:
+ *   g = "this bit makes a carry"      = x & y
+ *   p = "this bit passes a carry on"  = x ^ y
+ * then each step combines a bit with the one d places to its right
+ * (d = 1, 2, 4, 8, 16):
+ *   g[i] = g[i] | (p[i] & g[i-d])
+ *   p[i] = p[i] & p[i-d]
+ * after 5 steps g[i] is the carry out of bit i.
+ */
 
 `default_nettype none
 
