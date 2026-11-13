@@ -41,6 +41,8 @@ struct faller {
 static struct faller stuff[4];
 static int px = 304;
 static int level, n, lives = 3;
+static int beep;    // frames left on the "caught" sound
+static int crash;   // frames left on the "hit a bomb" sound
 
 static u32 seed = 12345;
 
@@ -78,6 +80,24 @@ static void draw_faller(int i)
         shape(i, stuff[i].x, stuff[i].y, 16, STAR, 0x3c);
 }
 
+static void sounds(void)
+{
+    int vol0 = 0, noise = 0;
+
+    if (beep) {
+        SND_VOICE0 = NOTE(880 + 40 * beep);
+        vol0 = beep;
+        beep--;
+    }
+    if (crash) {
+        SND_NOISE = 8;
+        noise = crash;
+        crash--;
+    }
+
+    SND_VOLUME = vol0 | (noise << 8);
+}
+
 int main(void)
 {
     set_level(0);
@@ -98,9 +118,11 @@ int main(void)
             for (int i = 0; i < 4; i++) {
                 if (!(hits & HIT_SPRITE(i)) || stuff[i].y < 380)
                     continue;
-                if (stuff[i].kind)
+                if (stuff[i].kind) {
+                    crash = 15;
                     lives--;
-                else {
+                } else {
+                    beep = 12;
                     n++;
                     if (n % 10 == 0)
                         set_level(level + 1);
@@ -137,5 +159,7 @@ int main(void)
 
         // slowly drift the background
         GPU_SCROLLX = frame >> 1;
+
+        sounds();
     }
 }
