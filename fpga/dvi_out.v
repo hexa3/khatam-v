@@ -20,15 +20,21 @@ module dvi_out (
   tmds_encoder enc_g (.clk(clk_pix), .d(g), .c(2'b00),          .de(de), .q(tmds_g));
   tmds_encoder enc_r (.clk(clk_pix), .d(r), .c(2'b00),          .de(de), .q(tmds_r));
 
+  // flips every pixel clock, the fast side watches this so it knows when
+  // a fresh word is ready (instead of just hoping its counter lines up)
+  reg toggle = 0;
+  always @(posedge clk_pix) toggle <= ~toggle;
+
   // ---- shift out (125 MHz domain) ----
-  // 125 MHz is 5x the pixel clock so grab a new word every 5 clocks
-  reg [2:0] cnt = 0;
+  reg [2:0] toggle_sync = 0;
+  reg       load = 0;
   reg [9:0] sh_r = 0, sh_g = 0, sh_b = 0, sh_c = 0;
 
   always @(posedge clk_shift) begin
-    cnt <= (cnt == 4) ? 3'd0 : cnt + 1;
+    toggle_sync <= {toggle_sync[1:0], toggle};
+    load <= toggle_sync[2] ^ toggle_sync[1];   // fires once every 5 clocks
 
-    if (cnt == 4) begin
+    if (load) begin
       sh_r <= tmds_r;
       sh_g <= tmds_g;
       sh_b <= tmds_b;
