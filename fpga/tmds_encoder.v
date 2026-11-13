@@ -43,8 +43,8 @@ module tmds_encoder (
       cnt <= 0;
       case (c)
         2'b00: q <= 10'b1101010100;
-        2'b01: q <= 10'b0101010100;
-        2'b10: q <= 10'b0010101011;
+        2'b01: q <= 10'b0010101011;
+        2'b10: q <= 10'b0101010100;
         2'b11: q <= 10'b1010101011;
       endcase
     end else if (cnt_zero || ones_qm == 4) begin
