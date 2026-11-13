@@ -93,5 +93,6 @@ static inline u32 buttons(void)
 }
 
 void sound_off(void);
+u32  random(void);
 
 #endif

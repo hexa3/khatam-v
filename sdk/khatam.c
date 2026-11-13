@@ -55,3 +55,16 @@ void sound_off(void)
 {
     SND_VOLUME = 0;
 }
+
+// xorshift, seeded from the frame counter + beam position the first time
+static u32 seed;
+
+u32 random(void)
+{
+    if (seed == 0)
+        seed = (FRAME << 10) ^ LINE ^ 0x5eed;
+    seed ^= seed << 13;
+    seed ^= seed >> 17;
+    seed ^= seed << 5;
+    return seed;
+}

@@ -50,16 +50,6 @@ static int level, n, lives;
 static int beep;    // frames left on the "caught" sound
 static int crash;   // frames left on the "hit a bomb" sound
 
-static u32 seed = 12345;
-
-static u32 random(void)
-{
-    seed ^= seed << 13;
-    seed ^= seed >> 17;
-    seed ^= seed << 5;
-    return seed;
-}
-
 static void set_level(int lv)
 {
     level = lv;
