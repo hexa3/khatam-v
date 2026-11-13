@@ -33,6 +33,24 @@ int __modsi3(int n, int d)
     return n - __divsi3(n, d) * d;
 }
 
+// clang calls these by itself even with -nostdlib
+void *memset(void *dst, int c, u32 n)
+{
+    u8 *p = dst;
+    while (n--)
+        *p++ = c;
+    return dst;
+}
+
+void *memcpy(void *dst, const void *src, u32 n)
+{
+    u8 *d = dst;
+    const u8 *s = src;
+    while (n--)
+        *d++ = *s++;
+    return dst;
+}
+
 void sound_off(void)
 {
     SND_VOLUME = 0;
