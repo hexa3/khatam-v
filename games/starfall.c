@@ -34,6 +34,12 @@ static const u8 themes[4][5] = {
     {RGB(0,0,0), RGB(1,0,1), RGB(2,0,2), RGB(3,3,3), RGB(3,0,3)}, // night
 };
 
+// bass line, one note every 16 frames
+static const u16 bass[8] = {
+    NOTE(110), NOTE(110), NOTE(131), NOTE(110),
+    NOTE(98),  NOTE(98),  NOTE(147), NOTE(131),
+};
+
 struct faller {
     int x, y, speed, kind;  // kind 0 = star (good), 1 = bomb
 };
@@ -80,7 +86,7 @@ static void draw_faller(int i)
         shape(i, stuff[i].x, stuff[i].y, 16, STAR, 0x3c);
 }
 
-static void sounds(void)
+static void sounds(u32 frame)
 {
     int vol0 = 0, noise = 0;
 
@@ -95,7 +101,12 @@ static void sounds(void)
         crash--;
     }
 
-    SND_VOLUME = vol0 | (noise << 8);
+    SND_VOICE1 = bass[(frame >> 4) & 7];
+    int bassvol = 6 - ((frame >> 1) & 7);   // little "pluck" on each note
+    if (bassvol < 0)
+        bassvol = 0;
+
+    SND_VOLUME = vol0 | (bassvol << 4) | (noise << 8);
 }
 
 int main(void)
@@ -160,6 +171,6 @@ int main(void)
         // slowly drift the background
         GPU_SCROLLX = frame >> 1;
 
-        sounds();
+        sounds(frame);
     }
 }
