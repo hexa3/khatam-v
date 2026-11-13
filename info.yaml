@@ -17,6 +17,7 @@ project:
     - "gpu.v"
     - "cpu.v"
     - "qspi.v"
+    - "audio.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 pinout:
@@ -48,7 +49,7 @@ pinout:
   uio[4]: "IO2 (held high)"
   uio[5]: "IO3 (held high)"
   uio[6]: "PSRAM CS"
-  uio[7]: ""
+  uio[7]: "audio out (PWM)"
 
 # Do not change!
 yaml_version: 6
