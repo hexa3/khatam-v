@@ -3,7 +3,7 @@
 #   make flash   -> write it to flash
 
 GAME ?= starfall
-SOURCES = ../src/project.v ../src/cpu.v ../src/qspi.v ../src/gpu.v ../src/audio.v \
+SOURCES = ../src/project.v ../src/cpu.v ../src/adder.v ../src/qspi.v ../src/gpu.v ../src/audio.v \
           top.v spi_bram.v pll.v dvi_out.v tmds_encoder.v
 
 all: prog
