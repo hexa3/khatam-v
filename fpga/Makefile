@@ -1,13 +1,18 @@
-# build for the Icepi Zero
-#   make       -> khatam_v.bit  (do a make in the top folder first)
+# build + flash for the Icepi Zero
+#   make         -> build it and load it
+#   make flash   -> write it to flash
 
+GAME ?= starfall
 SOURCES = ../src/project.v ../src/cpu.v ../src/qspi.v ../src/gpu.v ../src/audio.v \
           top.v spi_bram.v pll.v dvi_out.v tmds_encoder.v
 
-all: khatam_v.bit
+all: prog
 
-firmware.hex: ../build/starfall.hex
+firmware.hex: ../build/$(GAME).hex
 	cp $< $@
+
+../build/$(GAME).hex: FORCE
+	$(MAKE) -C .. GAME=$(GAME)
 
 khatam_v.json: $(SOURCES) firmware.hex
 	yosys -q -p 'synth_ecp5 -top top -json $@' $(SOURCES)
@@ -18,7 +23,16 @@ khatam_v.config: khatam_v.json icepi-zero.lpf
 khatam_v.bit: khatam_v.config
 	ecppack --compress $< $@
 
+build: khatam_v.bit
+
+prog: khatam_v.bit
+	openFPGALoader -b icepi-zero $<
+
+flash: khatam_v.bit
+	openFPGALoader -b icepi-zero --write-flash $<
+
 clean:
 	rm -f khatam_v.json khatam_v.config khatam_v.bit firmware.hex
 
-.PHONY: all clean
+FORCE:
+.PHONY: all build prog flash clean FORCE
