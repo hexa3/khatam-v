@@ -2,6 +2,13 @@
 
 #include "khatam.h"
 
+#define LEFT   1
+#define RIGHT  2
+#define START  4
+
+#define PLAYER_Y  420
+#define NUM_FALL  4
+
 static const u8 lantern[8] = {
     0x18, // ...##...
     0x3c, // ..####..
@@ -44,9 +51,9 @@ struct faller {
     int x, y, speed, kind;  // kind 0 = star (good), 1 = bomb
 };
 
-static struct faller stuff[4];
-static int px;
-static int level, n, lives;
+static struct faller fall[NUM_FALL];
+static int player_x;
+static int level, caught, lives;
 static int beep;    // frames left on the "caught" sound
 static int crash;   // frames left on the "hit a bomb" sound
 
@@ -62,18 +69,18 @@ static void set_level(int lv)
 
 static void new_faller(int i)
 {
-    stuff[i].x = 40 + random() % 560;
-    stuff[i].y = 0;
-    stuff[i].speed = 1 + level + random() % 3;
-    stuff[i].kind = (random() % 4 == 0);   // 1 in 4 is a bomb
+    fall[i].x = 40 + random() % 560;
+    fall[i].y = 0;
+    fall[i].speed = 1 + level + random() % 3;
+    fall[i].kind = (random() % 4 == 0);   // 1 in 4 is a bomb
 }
 
 static void draw_faller(int i)
 {
-    if (stuff[i].kind)
-        shape(i, stuff[i].x, stuff[i].y, 12, OCTAGON, RGB(3, 0, 0));
+    if (fall[i].kind)
+        shape(i, fall[i].x, fall[i].y, 12, OCTAGON, RGB(3, 0, 0));
     else
-        shape(i, stuff[i].x, stuff[i].y, 16, STAR, 0x3c);
+        shape(i, fall[i].x, fall[i].y, 16, STAR, 0x3c);
 }
 
 static void sounds(u32 frame)
@@ -101,27 +108,27 @@ static void sounds(u32 frame)
 
 static void new_game(void)
 {
-    px = 304;
-    n = 0;
+    player_x = 304;
+    caught = 0;
     lives = 3;
     set_level(0);
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < NUM_FALL; i++) {
         new_faller(i);
-        stuff[i].y = -(i * 120);   // spread them out at the start
+        fall[i].y = -(i * 120);   // spread them out at the start
     }
 }
 
 static void game_over(void)
 {
     sound_off();
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < NUM_FALL; i++)
         shape_off(i);
     BITMAP_CTRL(0) = 0;
 
     // red background until start is pressed
     GPU_PAL(0) = RGB(2, 0, 0);
     GPU_PATTERN = 0;
-    while (!(buttons() & 4))
+    while (!(buttons() & START))
         wait_vblank();
 }
 
@@ -138,16 +145,16 @@ int main(void)
         COLLIDE = 0;
 
         if (hits & HIT_SPRITE(4)) {
-            for (int i = 0; i < 4; i++) {
-                if (!(hits & HIT_SPRITE(i)) || stuff[i].y < 380)
+            for (int i = 0; i < NUM_FALL; i++) {
+                if (!(hits & HIT_SPRITE(i)) || fall[i].y < PLAYER_Y - 40)
                     continue;
-                if (stuff[i].kind) {
+                if (fall[i].kind) {
                     crash = 15;
                     lives--;
                 } else {
                     beep = 12;
-                    n++;
-                    if (n % 10 == 0)
+                    caught++;
+                    if (caught % 10 == 0)
                         set_level(level + 1);
                 }
                 new_faller(i);
@@ -162,18 +169,18 @@ int main(void)
 
         // move the player
         u32 b = buttons();
-        if ((b & 1) && px > 4)
-            px -= 6;
-        if ((b & 2) && px < 640)
-            px += 6;
-        bitmap(0, px, 420, 2, 0x38, lantern);
+        if ((b & LEFT) && player_x > 4)
+            player_x -= 6;
+        if ((b & RIGHT) && player_x < 640)
+            player_x += 6;
+        bitmap(0, player_x, PLAYER_Y, 2, 0x38, lantern);
 
         // move the stars
-        for (int i = 0; i < 4; i++) {
-            stuff[i].y += stuff[i].speed;
-            if (stuff[i].y > 496)
+        for (int i = 0; i < NUM_FALL; i++) {
+            fall[i].y += fall[i].speed;
+            if (fall[i].y > 480 + 16)
                 new_faller(i);
-            if (stuff[i].y >= 0)
+            if (fall[i].y >= 0)
                 draw_faller(i);
             else
                 shape_off(i);
