@@ -4,6 +4,8 @@
 module top (
     input  wire       clk,       // 50 MHz
     input  wire [1:0] button,    // active low
+    input  wire [4:0] sw,
+    output wire       audio,
     output wire [4:0] led,
     output wire [3:0] gpdi_dp
 );
@@ -28,7 +30,7 @@ module top (
     btn_s2 <= btn_s1;
   end
   wire both = btn_s2[0] & btn_s2[1];
-  wire [7:0] ui_in = {5'd0, both, btn_s2[1] & ~both, btn_s2[0] & ~both};
+  wire [7:0] ui_in = {sw, both, btn_s2[1] & ~both, btn_s2[0] & ~both};
 
   // ---------------- the chip ----------------
   wire [7:0] uo_out, uio_out, uio_oe;
@@ -52,6 +54,8 @@ module top (
 
   spi_bram #(.WRITABLE(1)) psram (
       .clk(clk_pix), .cs_n(uio_out[6]), .sck(uio_out[3]), .mosi(uio_out[1]), .miso(miso_ram));
+
+  assign audio = uio_out[7];
 
   // ---------------- VGA -> HDMI ----------------
   wire [1:0] red   = {uo_out[0], uo_out[4]};
