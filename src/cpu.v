@@ -58,12 +58,19 @@ module cpu (
   wire [31:0] rs2_val = (rs2 == 0) ? 32'd0 : regs[rs2];
 
   // ALU
-  wire [31:0] b_in = (opcode == OP_REG) ? rs2_val : imm_i;
+  wire [31:0] b_in = (opcode == OP_REG) ? rs2_val : (opcode == OP_STORE ? imm_s : imm_i);
+
+  // one adder for add, sub and the load/store address (was 3 separate + and -)
+  // subtract = add the inverted number + 1
+  wire        do_sub = (opcode == OP_REG) && (f3 == 3'b000) && ir[30];
+  wire [31:0] sum;
+  wire        carry;
+  adder alu_add (.x(rs1_val), .y(do_sub ? ~b_in : b_in), .cin(do_sub), .s(sum), .cout(carry));
 
   reg [31:0] alu;
   always @(*) begin
     case (f3)
-      3'b000:  alu = (opcode == OP_REG && ir[30]) ? rs1_val - b_in : rs1_val + b_in;
+      3'b000:  alu = sum;
       3'b001:  alu = rs1_val << b_in[4:0];
       3'b010:  alu = ($signed(rs1_val) < $signed(b_in)) ? 32'd1 : 32'd0;
       3'b011:  alu = (rs1_val < b_in) ? 32'd1 : 32'd0;
@@ -98,10 +105,8 @@ module cpu (
   wire [32:0] hi_add = hi + (lo[0] ? rs1_val : 32'd0);
 
   // memory bus
-  wire [31:0] addr = rs1_val + ((opcode == OP_STORE) ? imm_s : imm_i);
-
   assign mem_req   = (state == FETCH) || (state == MEM);
-  assign mem_addr  = (state == FETCH) ? pc : addr[25:0];
+  assign mem_addr  = (state == FETCH) ? pc : sum[25:0];
   assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
   assign mem_we    = (state == MEM) && (opcode == OP_STORE);
   assign mem_wdata = rs2_val;
