@@ -51,6 +51,6 @@ module spi_bram #(
 
   // the chip samples MISO one clock before it drops SCK, which is 2 clocks
   // after we saw the rising edge, so the block RAM has caught up by then
-  assign miso = rbyte[dbits[2:0]];
+  assign miso = rbyte[7 - dbits[2:0]];
 
 endmodule
