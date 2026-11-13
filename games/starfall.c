@@ -45,8 +45,8 @@ struct faller {
 };
 
 static struct faller stuff[4];
-static int px = 304;
-static int level, n, lives = 3;
+static int px;
+static int level, n, lives;
 static int beep;    // frames left on the "caught" sound
 static int crash;   // frames left on the "hit a bomb" sound
 
@@ -109,13 +109,35 @@ static void sounds(u32 frame)
     SND_VOLUME = vol0 | (bassvol << 4) | (noise << 8);
 }
 
-int main(void)
+static void new_game(void)
 {
+    px = 304;
+    n = 0;
+    lives = 3;
     set_level(0);
     for (int i = 0; i < 4; i++) {
         new_faller(i);
         stuff[i].y = -(i * 120);   // spread them out at the start
     }
+}
+
+static void game_over(void)
+{
+    sound_off();
+    for (int i = 0; i < 4; i++)
+        shape_off(i);
+    BITMAP_CTRL(0) = 0;
+
+    // red background until start is pressed
+    GPU_PAL(0) = RGB(2, 0, 0);
+    GPU_PATTERN = 0;
+    while (!(buttons() & 4))
+        wait_vblank();
+}
+
+int main(void)
+{
+    new_game();
 
     while (1) {
         wait_vblank();
@@ -141,12 +163,11 @@ int main(void)
                 new_faller(i);
             }
         }
-        GPU_RADIUS = 8 + n;   // testing, star gets bigger every catch
 
         if (lives == 0) {
-            // TODO game over screen
-            while (1)
-                ;
+            game_over();
+            new_game();
+            continue;
         }
 
         // move the player
