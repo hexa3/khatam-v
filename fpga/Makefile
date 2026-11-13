@@ -6,9 +6,8 @@ SOURCES = ../src/project.v ../src/cpu.v ../src/qspi.v ../src/gpu.v ../src/audio.
 
 all: khatam_v.bit
 
-# one byte per line, for $$readmemh
-firmware.hex: ../build/starfall.bin
-	od -An -tx1 -v $< | tr -s ' ' '\n' | sed '/^$$/d' > $@
+firmware.hex: ../build/starfall.hex
+	cp $< $@
 
 khatam_v.json: $(SOURCES) firmware.hex
 	yosys -q -p 'synth_ecp5 -top top -json $@' $(SOURCES)

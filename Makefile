@@ -8,7 +8,7 @@ OBJCOPY = llvm-objcopy
 CFLAGS = --target=riscv32-unknown-elf -march=rv32e_zmmul -mabi=ilp32e \
          -Os -ffreestanding -nostdlib -Isdk
 
-all: build/starfall.bin
+all: build/starfall.bin build/starfall.hex
 
 build/starfall.o: games/starfall.c sdk/khatam.h | build
 	$(CC) $(CFLAGS) -c games/starfall.c -o build/starfall.o
@@ -24,6 +24,10 @@ build/starfall.elf: build/crt0.o build/starfall.o build/sdk.o sdk/link.ld
 
 build/starfall.bin: build/starfall.elf
 	$(OBJCOPY) -O binary build/starfall.elf build/starfall.bin
+
+# one byte per line, for $$readmemh in the FPGA build
+build/starfall.hex: build/starfall.bin
+	od -An -tx1 -v $< | tr -s ' ' '\n' | sed '/^$$/d' > $@
 
 build:
 	mkdir -p build
