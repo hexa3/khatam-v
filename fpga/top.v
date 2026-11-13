@@ -4,6 +4,7 @@
 module top (
     input  wire       clk,       // 50 MHz
     input  wire [1:0] button,    // active low
+    output wire [4:0] led,
     output wire [3:0] gpdi_dp
 );
 
@@ -26,7 +27,8 @@ module top (
     btn_s1 <= ~button;
     btn_s2 <= btn_s1;
   end
-  wire [7:0] ui_in = {6'd0, btn_s2};
+  wire both = btn_s2[0] & btn_s2[1];
+  wire [7:0] ui_in = {5'd0, both, btn_s2[1] & ~both, btn_s2[0] & ~both};
 
   // ---------------- the chip ----------------
   wire [7:0] uo_out, uio_out, uio_oe;
@@ -91,5 +93,8 @@ module top (
       .de       (de),
       .gpdi_dp  (gpdi_dp)
   );
+
+  // lights: pll locked, flash busy, ram busy, sound, vsync
+  assign led = {vsync, uio_out[7], ~uio_out[6], ~uio_out[0], locked};
 
 endmodule
