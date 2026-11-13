@@ -45,10 +45,10 @@ module top (
   );
 
   // ---------------- fake QSPI Pmod ----------------
-  spi_bram #(.INIT("firmware.hex")) flash (
+  spi_bram #(.INIT("firmware.hex"), .WRITABLE(0)) flash (
       .clk(clk_pix), .cs_n(uio_out[0]), .sck(uio_out[3]), .mosi(uio_out[1]), .miso(miso_flash));
 
-  spi_bram psram (
+  spi_bram #(.WRITABLE(1)) psram (
       .clk(clk_pix), .cs_n(uio_out[6]), .sck(uio_out[3]), .mosi(uio_out[1]), .miso(miso_ram));
 
   // ---------------- VGA -> HDMI ----------------

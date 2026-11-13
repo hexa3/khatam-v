@@ -1,10 +1,12 @@
 // Pretend SPI memory chip made out of FPGA block RAM, so the Icepi Zero can
-// stand in for the QSPI Pmod. Only does 0x03 (read) for now. 32 KB, the
-// address just wraps after that.
+// stand in for the QSPI Pmod. Understands the same two commands the chip
+// uses: 0x03 read and 0x02 write. 32 KB, the address just wraps after that
+// (so the stack at the top of "8 MB" lands at the top of the 32 KB).
 `default_nettype none
 
 module spi_bram #(
-    parameter INIT = ""
+    parameter INIT     = "",
+    parameter WRITABLE = 1
 ) (
     input  wire clk,
     input  wire cs_n,
@@ -21,6 +23,7 @@ module spi_bram #(
   reg [7:0]  cmd = 0;
   reg [23:0] addr = 0;
   reg [17:0] dbits = 0;         // bits seen in the data part
+  reg [7:0]  wbyte = 0;
   reg [7:0]  rbyte = 0;
 
   wire rise = sck && !sck_prev;
@@ -45,6 +48,11 @@ module spi_bram #(
         cnt  <= cnt + 1;
       end else begin
         dbits <= dbits + 1;
+        if (cmd == 8'h02) begin
+          wbyte <= {wbyte[6:0], mosi};
+          if (WRITABLE && dbits[2:0] == 3'd7)
+            mem[byte_addr] <= {wbyte[6:0], mosi};
+        end
       end
     end
   end
