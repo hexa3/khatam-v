@@ -33,8 +33,8 @@ int __modsi3(int n, int d)
     return n - __divsi3(n, d) * d;
 }
 
-// clang calls these by itself even with -nostdlib
-void *memset(void *dst, int c, u32 n)
+// no_builtin stops clang "optimising" these into calls to themselves
+__attribute__((no_builtin)) void *memset(void *dst, int c, u32 n)
 {
     u8 *p = dst;
     while (n--)
@@ -42,7 +42,7 @@ void *memset(void *dst, int c, u32 n)
     return dst;
 }
 
-void *memcpy(void *dst, const void *src, u32 n)
+__attribute__((no_builtin)) void *memcpy(void *dst, const void *src, u32 n)
 {
     u8 *d = dst;
     const u8 *s = src;
