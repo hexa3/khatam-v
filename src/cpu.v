@@ -58,22 +58,30 @@ module cpu (
   wire [31:0] rs2_val = (rs2 == 0) ? 32'd0 : regs[rs2];
 
   // ALU
-  wire [31:0] b_in = (opcode == OP_REG) ? rs2_val : (opcode == OP_STORE ? imm_s : imm_i);
+  wire [31:0] b_in = (opcode == OP_REG || opcode == OP_BRANCH) ? rs2_val :
+                     (opcode == OP_STORE ? imm_s : imm_i);
 
-  // one adder for add, sub and the load/store address (was 3 separate + and -)
+  // one adder for everything: add, sub, compares, addresses
   // subtract = add the inverted number + 1
-  wire        do_sub = (opcode == OP_REG) && (f3 == 3'b000) && ir[30];
+  wire        is_cmp = (opcode == OP_REG || opcode == OP_IMM) && (f3 == 3'b010 || f3 == 3'b011);
+  wire        do_sub = (opcode == OP_BRANCH) || is_cmp || ((opcode == OP_REG) && (f3 == 3'b000) && ir[30]);
+  wire [31:0] yv     = do_sub ? ~b_in : b_in;
   wire [31:0] sum;
   wire        carry;
-  adder alu_add (.x(rs1_val), .y(do_sub ? ~b_in : b_in), .cin(do_sub), .s(sum), .cout(carry));
+  adder alu_add (.x(rs1_val), .y(yv), .cin(do_sub), .s(sum), .cout(carry));
+
+  // compares are a subtract, so the real operand is ~yv
+  wire eq  = ((rs1_val ^ yv) == 32'hffffffff);
+  wire ltu = ~carry;                                      // no carry out = it borrowed
+  wire lt  = (rs1_val[31] == yv[31]) ? rs1_val[31] : ltu; // signs differ -> less if rs1 is negative
 
   reg [31:0] alu;
   always @(*) begin
     case (f3)
       3'b000:  alu = sum;
       3'b001:  alu = rs1_val << b_in[4:0];
-      3'b010:  alu = ($signed(rs1_val) < $signed(b_in)) ? 32'd1 : 32'd0;
-      3'b011:  alu = (rs1_val < b_in) ? 32'd1 : 32'd0;
+      3'b010:  alu = {31'd0, lt};
+      3'b011:  alu = {31'd0, ltu};
       3'b100:  alu = rs1_val ^ b_in;
       3'b101:  alu = ir[30] ? $signed(rs1_val) >>> b_in[4:0] : rs1_val >> b_in[4:0];
       3'b110:  alu = rs1_val | b_in;
@@ -85,12 +93,12 @@ module cpu (
   reg take;
   always @(*) begin
     case (f3)
-      3'b000:  take = (rs1_val == rs2_val);
-      3'b001:  take = (rs1_val != rs2_val);
-      3'b100:  take = ($signed(rs1_val) < $signed(rs2_val));
-      3'b101:  take = ($signed(rs1_val) >= $signed(rs2_val));
-      3'b110:  take = (rs1_val < rs2_val);
-      3'b111:  take = (rs1_val >= rs2_val);
+      3'b000:  take = eq;
+      3'b001:  take = !eq;
+      3'b100:  take = lt;
+      3'b101:  take = !lt;
+      3'b110:  take = ltu;
+      3'b111:  take = !ltu;
       default: take = 0;
     endcase
   end
