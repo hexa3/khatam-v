@@ -22,6 +22,9 @@ static u32 seed;
 
 static u32 random(void)
 {
+    // seeded from the frame counter + beam position the first time
+    if (seed == 0)
+        seed = (FRAME << 10) ^ LINE ^ 0x5eed;
     seed ^= seed << 13;
     seed ^= seed >> 17;
     seed ^= seed << 5;
