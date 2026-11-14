@@ -18,17 +18,18 @@ module cpu (
   localparam RS2   = 4'd2;
   localparam EXEC  = 4'd3;
   localparam MEM   = 4'd4;
-  localparam MUL   = 4'd5;
-  localparam FIX0  = 4'd6;
-  localparam FIX1  = 4'd7;
-  localparam FIX2  = 4'd8;
+  localparam WB    = 4'd5;
+  localparam MUL   = 4'd6;
+  localparam FIX0  = 4'd7;
+  localparam FIX1  = 4'd8;
+  localparam FIX2  = 4'd9;
 
   reg [3:0]  state;
   reg [25:0] pc;
   reg [31:0] ir;
   reg [31:0] a;        // rs1
   reg [31:0] hi;       // rs2, then the high half of a multiply
-  reg [31:0] lo;       // low half of a multiply
+  reg [31:0] lo;       // result / low half of a multiply
   reg [4:0]  count;
 
   reg [31:0] regs [1:15];
@@ -61,6 +62,11 @@ module cpu (
   // one read port: rs1 in RS1, rs2 everywhere else
   wire [3:0]  rsel = (state == RS1) ? rs1 : rs2;
   wire [31:0] rval = (rsel == 0) ? 32'd0 : regs[rsel];
+
+  // one write port, always from lo
+  always @(posedge clk) begin
+    if (state == WB && rd != 0) regs[rd] <= lo;
+  end
 
   // ALU
   wire [31:0] b = hi;   // rs2
@@ -185,32 +191,37 @@ module cpu (
             count <= 0;
             state <= MUL;
           end else begin
-              if (rd != 0) begin
-                case (opcode)
-                  OP_LUI:         regs[rd] <= imm_u;
-                  OP_AUIPC:       regs[rd] <= {6'd0, pc} + imm_u;
-                  OP_JAL, OP_JALR: regs[rd] <= {6'd0, pc + 26'd4};
-                  OP_IMM:         regs[rd] <= alu;
-                  OP_REG:         regs[rd] <= alu;
-                  default: ;
-                endcase
-              end
-              if (opcode == OP_JAL)
-                pc <= pc + imm_j[25:0];
-              else if (opcode == OP_BRANCH && take)
-                pc <= pc + imm_b[25:0];
-              else if (opcode == OP_JALR)
-                pc <= (a[25:0] + imm_i[25:0]) & ~26'd1;
-              else
-                pc <= pc + 4;
-              state <= FETCH;
+            case (opcode)
+              OP_LUI:          lo <= imm_u;
+              OP_AUIPC:        lo <= {6'd0, pc} + imm_u;
+              OP_JAL, OP_JALR: lo <= {6'd0, pc + 26'd4};
+              default:         lo <= alu;
+            endcase
+            if (opcode == OP_JAL)
+              pc <= pc + imm_j[25:0];
+            else if (opcode == OP_BRANCH && take)
+              pc <= pc + imm_b[25:0];
+            else if (opcode == OP_JALR)
+              pc <= (a[25:0] + imm_i[25:0]) & ~26'd1;
+            else
+              pc <= pc + 4;
+            state <= (opcode == OP_BRANCH) ? FETCH : WB;
           end
         end
 
         MEM: if (mem_done) begin
-          if (opcode == OP_LOAD && rd != 0)
-            regs[rd] <= load_val;
-          pc    <= pc + 4;
+          if (opcode == OP_STORE) begin
+            pc    <= pc + 4;
+            state <= FETCH;
+          end else begin
+            lo    <= load_val;
+            state <= WB;
+          end
+        end
+
+        WB: begin
+          // register write happens in the always block up top
+          if (opcode == OP_LOAD || is_mul) pc <= pc + 4;   // the others moved pc in EXEC
           state <= FETCH;
         end
 
@@ -218,16 +229,8 @@ module cpu (
           hi    <= hi_add[32:1];
           lo    <= {hi_add[0], lo[31:1]};
           count <= count + 1;
-          if (count == 31) begin
-            if (f3[1:0] == 2'b00) begin   // MUL wants lo, it's done
-              if (rd != 0)
-                regs[rd] <= {hi_add[0], lo[31:1]};
-              pc    <= pc + 4;
-              state <= FETCH;
-            end else begin
-              state <= FIX0;
-            end
-          end
+          if (count == 31)
+            state <= (f3[1:0] == 2'b00) ? WB : FIX0;   // MUL wants lo, it's done
         end
 
         FIX0: begin
@@ -243,10 +246,8 @@ module cpu (
         end
 
         FIX2: begin
-          if (rd != 0)
-            regs[rd] <= hi;
-          pc    <= pc + 4;
-          state <= FETCH;
+          lo    <= hi;
+          state <= WB;
         end
 
         default: state <= FETCH;
