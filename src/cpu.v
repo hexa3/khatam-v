@@ -30,6 +30,8 @@ module cpu (
   reg [31:0] a;        // rs1
   reg [31:0] hi;       // rs2, then the high half of a multiply
   reg [31:0] lo;       // result / low half of a multiply
+  reg [31:0] yv;       // second ALU operand, already flipped if we're subtracting
+  reg        sub;      // ...and whether we are
   reg [4:0]  count;
 
   reg [31:0] regs [1:15];
@@ -58,6 +60,11 @@ module cpu (
   localparam OP_IMM    = 7'b0010011;
   localparam OP_REG    = 7'b0110011;
 
+  wire is_reg    = (opcode == OP_REG);
+  wire is_branch = (opcode == OP_BRANCH);
+  wire is_store  = (opcode == OP_STORE);
+  wire is_mul    = is_reg && (f7 == 7'b0000001);
+
   // register file, x0 is always 0
   // one read port: rs1 in RS1, rs2 everywhere else
   wire [3:0]  rsel = (state == RS1) ? rs1 : rs2;
@@ -70,26 +77,31 @@ module cpu (
 
   // ALU
   wire [31:0] b = hi;   // rs2
-  wire [31:0] b_in = (opcode == OP_REG || opcode == OP_BRANCH) ? b :
-                     (opcode == OP_STORE ? imm_s : imm_i);
+
+  // second operand: rs2 for register ops and branches, otherwise an immediate.
+  // this all gets worked out in RS2 and latched into yv, already inverted if
+  // it's a subtract, so EXEC can start adding straight away (GF180 is slow!)
+  wire is_alu  = is_reg || (opcode == OP_IMM);
+  wire is_cmp  = is_alu && (f3 == 3'b010 || f3 == 3'b011);   // SLT, SLTU
+  wire do_sub  = is_branch || is_cmp || (is_reg && f3 == 3'b000 && ir[30]);
+  wire [31:0] y_next = (is_reg || is_branch) ? rval : (is_store ? imm_s : imm_i);
 
   // one adder for everything: add, sub, compares, addresses
   // subtract = add the inverted number + 1
-  wire        is_cmp = (opcode == OP_REG || opcode == OP_IMM) && (f3 == 3'b010 || f3 == 3'b011);
-  wire        do_sub = (opcode == OP_BRANCH) || is_cmp || ((opcode == OP_REG) && (f3 == 3'b000) && ir[30]);
-  wire [31:0] yv     = do_sub ? ~b_in : b_in;
   wire [31:0] sum;
   wire        carry;
-  adder alu_add (.x(a), .y(yv), .cin(do_sub), .s(sum), .cout(carry));
+  adder alu_add (.x(a), .y(yv), .cin(sub), .s(sum), .cout(carry));
 
-  // compares are a subtract, so the real operand is ~yv
+  // compares only happen when sub = 1, so the real operand is ~yv
   wire eq  = ((a ^ yv) == 32'hffffffff);
   wire ltu = ~carry;                                      // no carry out = it borrowed
-  wire lt  = (a[31] == yv[31]) ? a[31] : ltu; // signs differ -> less if rs1 is negative
+  wire lt  = (a[31] == yv[31]) ? a[31] : ltu;             // signs differ -> a is less if a is negative
+
+  wire [31:0] y = yv;   // for and/or/xor/shifts (never a subtract, so not inverted)
 
   // one shifter does all three: for a left shift, flip the bits around,
   // shift right, and flip them back
-  wire [4:0]  shamt   = b_in[4:0];
+  wire [4:0]  shamt   = y[4:0];
   wire        left    = (f3 == 3'b001);
   wire [31:0] a_rev, sh_rev, sh_out;
   genvar k;
@@ -100,7 +112,7 @@ module cpu (
     end
   endgenerate
   wire [31:0] sh_in   = left ? a_rev : a;
-  wire        sh_fill = ir[30] & a[31] & ~left;      // sign bit for SRA
+  wire        sh_fill = ir[30] & a[31] & ~left;            // sign bit for SRA
   wire [63:0] sh_wide = {{32{sh_fill}}, sh_in} >> shamt;
   assign      sh_out  = sh_wide[31:0];
   wire [31:0] shifted = left ? sh_rev : sh_out;
@@ -112,14 +124,13 @@ module cpu (
       3'b001:  alu = shifted;
       3'b010:  alu = {31'd0, lt};
       3'b011:  alu = {31'd0, ltu};
-      3'b100:  alu = a ^ b_in;
+      3'b100:  alu = a ^ y;
       3'b101:  alu = shifted;
-      3'b110:  alu = a | b_in;
-      default: alu = a & b_in;
+      3'b110:  alu = a | y;
+      default: alu = a & y;
     endcase
   end
 
-  // branches
   reg take;
   always @(*) begin
     case (f3)
@@ -139,7 +150,6 @@ module cpu (
   // that's an unsigned multiply. for MULH/MULHSU the top half gets fixed after:
   // FIX0: hi -= rs2 if rs1 was negative    (MULH, MULHSU)
   // FIX1: hi -= rs1 if rs2 was negative    (MULH)
-  wire        is_mul = (opcode == OP_REG) && (f7 == 7'b0000001);
   wire [32:0] hi_add = hi + (lo[0] ? a : 32'd0);
 
   // memory bus
@@ -179,6 +189,8 @@ module cpu (
 
         RS2: begin
           hi    <= rval;
+          yv    <= do_sub ? ~y_next : y_next;
+          sub   <= do_sub;
           state <= EXEC;
         end
 
