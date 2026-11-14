@@ -74,7 +74,8 @@ int main(void)
 
         if (hits & HIT_SPRITE(4)) {
             for (int i = 0; i < 4; i++) {
-                if (!(hits & HIT_SPRITE(i)))
+                // stars that touch each other count as a hit too, so only look near the bottom
+                if (!(hits & HIT_SPRITE(i)) || fall[i].y < 420 - 40)
                     continue;
                 if (fall[i].kind)
                     lives--;
