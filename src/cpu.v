@@ -163,13 +163,23 @@ module cpu (
   wire writes_rd = (opcode == OP_LUI) || (opcode == OP_AUIPC) || (opcode == OP_JAL) ||
                    (opcode == OP_JALR) || (opcode == OP_IMM) || is_reg;
 
-  // multiply (just the mul half of the M extension)
-  // the * was massive, so now it's shift-add, one bit per clock:
-  // hi += rs1 if the low bit of lo is set, then shift {hi,lo} right
-  // that's an unsigned multiply. for MULH/MULHSU the top half gets fixed after:
-  // FIX0: hi -= rs2 if rs1 was negative    (MULH, MULHSU)
-  // FIX1: hi -= rs1 if rs2 was negative    (MULH)
-  wire [32:0] hi_add = hi + (lo[0] ? a : 32'd0);
+  // multiply
+  // MUL:  hi += a if the low bit of lo is set, then shift {hi,lo} right
+  // FIX0: lo = rs2 (lo isn't needed any more for MULH*)
+  // FIX1: hi -= rs2 if rs1 was negative    (MULH, MULHSU)
+  // FIX2: lo = hi - rs1 if rs2 was negative (MULH)
+  wire        fix1_on = a[31] && (f3[1:0] == 2'b01 || f3[1:0] == 2'b10);
+  wire        fix2_on = lo[31] && (f3[1:0] == 2'b01);
+  reg  [31:0] addend;
+  always @(*) begin
+    case (state)
+      MUL:     addend = lo[0] ? a : 32'd0;
+      FIX1:    addend = fix1_on ? ~lo : 32'hffffffff;   // -rs2, or -0 (the +1 below fixes it)
+      default: addend = fix2_on ? ~a  : 32'hffffffff;   // -rs1
+    endcase
+  end
+  wire [32:0] hi_add;
+  adder mul_add (.x(hi), .y(addend), .cin(state != MUL), .s(hi_add[31:0]), .cout(hi_add[32]));
 
   // memory bus
   assign mem_req   = (state == FETCH) || (state == MEM);
@@ -251,6 +261,7 @@ module cpu (
         end
 
         MUL: begin
+          // classic shift-add, one bit per clock
           hi    <= hi_add[32:1];
           lo    <= {hi_add[0], lo[31:1]};
           count <= count + 1;
@@ -259,19 +270,17 @@ module cpu (
         end
 
         FIX0: begin
-          if (a[31] && (f3[1:0] == 2'b01 || f3[1:0] == 2'b10))
-            hi <= hi - rval;              // rs2 again, hi doesn't have it any more
+          lo    <= rval;                  // rs2 again
           state <= FIX1;
         end
 
         FIX1: begin
-          if (rval[31] && f3[1:0] == 2'b01)
-            hi <= hi - a;
+          hi    <= hi_add[31:0];
           state <= FIX2;
         end
 
         FIX2: begin
-          lo    <= hi;
+          lo    <= hi_add[31:0];
           state <= WB;
         end
 
