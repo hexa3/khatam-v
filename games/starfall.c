@@ -15,7 +15,11 @@ static const u8 lantern[8] = {
     0x18, // ...##...
 };
 
-static int fall_x[4], fall_y[4], fall_speed[4];
+struct faller {
+    int x, y, speed;
+};
+
+static struct faller fall[4];
 static int caught;
 
 // my own random for now
@@ -32,11 +36,11 @@ static u32 random(void)
     return seed;
 }
 
-static void new_star(int i)
+static void new_faller(int i)
 {
-    fall_x[i] = 40 + random() % 560;
-    fall_y[i] = 0;
-    fall_speed[i] = 1 + random() % 3;
+    fall[i].x = 40 + random() % 560;
+    fall[i].y = 0;
+    fall[i].speed = 1 + random() % 3;
 }
 
 int main(void)
@@ -47,8 +51,8 @@ int main(void)
     bitmap(0, player_x, 420, 2, RGB(3, 2, 0), lantern);
 
     for (int i = 0; i < 4; i++) {
-        new_star(i);
-        fall_y[i] = -(i * 120);
+        new_faller(i);
+        fall[i].y = -(i * 120);
     }
 
     while (1) {
@@ -63,7 +67,7 @@ int main(void)
             for (int i = 0; i < 4; i++) {
                 if (hits & HIT_SPRITE(i)) {
                     caught++;
-                    new_star(i);
+                    new_faller(i);
                 }
             }
         }
@@ -76,11 +80,11 @@ int main(void)
         BITMAP_X(0) = player_x;
 
         for (int i = 0; i < 4; i++) {
-            fall_y[i] += fall_speed[i];
-            if (fall_y[i] > 480 + 16)
-                new_star(i);
-            if (fall_y[i] >= 0)
-                shape(i, fall_x[i], fall_y[i], 16, STAR, RGB(3, 3, 0));
+            fall[i].y += fall[i].speed;
+            if (fall[i].y > 480 + 16)
+                new_faller(i);
+            if (fall[i].y >= 0)
+                shape(i, fall[i].x, fall[i].y, 16, STAR, RGB(3, 3, 0));
             else
                 shape_off(i);
         }
