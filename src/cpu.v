@@ -75,15 +75,33 @@ module cpu (
   wire ltu = ~carry;                                      // no carry out = it borrowed
   wire lt  = (rs1_val[31] == yv[31]) ? rs1_val[31] : ltu; // signs differ -> less if rs1 is negative
 
+  // one shifter does all three: for a left shift, flip the bits around,
+  // shift right, and flip them back
+  wire [4:0]  shamt   = b_in[4:0];
+  wire        left    = (f3 == 3'b001);
+  wire [31:0] a_rev, sh_rev, sh_out;
+  genvar k;
+  generate
+    for (k = 0; k < 32; k = k + 1) begin : rev
+      assign a_rev[k]  = rs1_val[31 - k];
+      assign sh_rev[k] = sh_out[31 - k];
+    end
+  endgenerate
+  wire [31:0] sh_in   = left ? a_rev : rs1_val;
+  wire        sh_fill = ir[30] & rs1_val[31] & ~left;      // sign bit for SRA
+  wire [63:0] sh_wide = {{32{sh_fill}}, sh_in} >> shamt;
+  assign      sh_out  = sh_wide[31:0];
+  wire [31:0] shifted = left ? sh_rev : sh_out;
+
   reg [31:0] alu;
   always @(*) begin
     case (f3)
       3'b000:  alu = sum;
-      3'b001:  alu = rs1_val << b_in[4:0];
+      3'b001:  alu = shifted;
       3'b010:  alu = {31'd0, lt};
       3'b011:  alu = {31'd0, ltu};
       3'b100:  alu = rs1_val ^ b_in;
-      3'b101:  alu = ir[30] ? $signed(rs1_val) >>> b_in[4:0] : rs1_val >> b_in[4:0];
+      3'b101:  alu = shifted;
       3'b110:  alu = rs1_val | b_in;
       default: alu = rs1_val & b_in;
     endcase
