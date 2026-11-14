@@ -1,3 +1,30 @@
+/*
+ * RV32E + Zmmul CPU
+ *
+ * Multi-cycle, nothing fancy. Fetch takes ages anyway because the code lives
+ * in SPI flash (~70 clocks), so there's no point pipelining anything. Instead
+ * it's built to be small and to make timing on GF180, which is slow:
+ *
+ *   - one register file read port, one shifter, shared adders
+ *   - rs1 gets latched into a, rs2 into hi, before EXEC
+ *   - every result goes into lo first, and WB writes lo into the register
+ *     file the clock after. so the register file only ever gets written from
+ *     one flip flop and there's never a giant path into it
+ *   - hi/lo are the multiplier registers the rest of the time
+ *
+ *   FETCH -> RS1 -> RS2 -> EXEC -> WB -> FETCH
+ *                           EXEC -> MEM -> (WB) -> FETCH
+ *                           EXEC -> MUL x32 -> (FIX0 -> FIX1 -> FIX2) -> WB
+ *
+ * - 15 registers (x1..x15), x0 is always 0          (that's the "E" in RV32E)
+ * - MUL/MULH/MULHSU/MULHU with a 32 step shift-add  (that's Zmmul)
+ * - FENCE / ECALL / EBREAK / CSR stuff = NOP
+ * - no interrupts, no traps. keep it simple
+ *
+ * Memory bus: mem_req is high in FETCH and MEM until mem_done. Bytes come
+ * back starting at mem_addr in rdata[7:0], so even misaligned loads work.
+ */
+
 `default_nettype none
 
 module cpu (
@@ -36,7 +63,7 @@ module cpu (
 
   reg [31:0] regs [1:15];
 
-  // decode
+  // ---------------- decode ----------------
   wire [6:0] opcode = ir[6:0];
   wire [3:0] rd     = ir[10:7];
   wire [2:0] f3     = ir[14:12];
@@ -65,7 +92,7 @@ module cpu (
   wire is_store  = (opcode == OP_STORE);
   wire is_mul    = is_reg && (f7 == 7'b0000001);
 
-  // register file, x0 is always 0
+  // ---------------- register file ----------------
   // one read port: rs1 in RS1, rs2 everywhere else
   wire [3:0]  rsel = (state == RS1) ? rs1 : rs2;
   wire [31:0] rval = (rsel == 0) ? 32'd0 : regs[rsel];
@@ -75,7 +102,7 @@ module cpu (
     if (state == WB && rd != 0) regs[rd] <= lo;
   end
 
-  // ALU
+  // ---------------- ALU ----------------
   wire [31:0] b = hi;   // rs2
 
   // second operand: rs2 for register ops and branches, otherwise an immediate.
@@ -163,7 +190,7 @@ module cpu (
   wire writes_rd = (opcode == OP_LUI) || (opcode == OP_AUIPC) || (opcode == OP_JAL) ||
                    (opcode == OP_JALR) || (opcode == OP_IMM) || is_reg;
 
-  // multiply
+  // ---------------- multiply ----------------
   // MUL:  hi += a if the low bit of lo is set, then shift {hi,lo} right
   // FIX0: lo = rs2 (lo isn't needed any more for MULH*)
   // FIX1: hi -= rs2 if rs1 was negative    (MULH, MULHSU)
@@ -181,7 +208,7 @@ module cpu (
   wire [32:0] hi_add;
   adder mul_add (.x(hi), .y(addend), .cin(state != MUL), .s(hi_add[31:0]), .cout(hi_add[32]));
 
-  // memory bus
+  // ---------------- memory bus ----------------
   assign mem_req   = (state == FETCH) || (state == MEM);
   assign mem_addr  = (state == FETCH) ? pc : lo[25:0];
   assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
@@ -199,6 +226,7 @@ module cpu (
     endcase
   end
 
+  // ---------------- state machine ----------------
   always @(posedge clk) begin
     if (!rst_n) begin
       state <= FETCH;
