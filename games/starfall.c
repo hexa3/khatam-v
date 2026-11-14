@@ -16,6 +16,7 @@ static const u8 lantern[8] = {
 };
 
 static int fall_x[4], fall_y[4], fall_speed[4];
+static int caught;
 
 // my own random for now
 static u32 seed;
@@ -52,6 +53,20 @@ int main(void)
 
     while (1) {
         wait_vblank();
+
+        // collisions from last frame
+        u32 hits = COLLIDE;
+        COLLIDE = 0;
+        GPU_PAL(0) = hits ? RGB(3, 0, 0) : RGB(3, 3, 3);   // debug: flash when something hits
+
+        if (hits & HIT_SPRITE(4)) {
+            for (int i = 0; i < 4; i++) {
+                if (hits & HIT_SPRITE(i)) {
+                    caught++;
+                    new_star(i);
+                }
+            }
+        }
 
         u32 b = buttons();
         if ((b & 1) && player_x > 4)
