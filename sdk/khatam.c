@@ -46,6 +46,24 @@ u32 __mulsi3(u32 a, u32 b)
     return r;
 }
 
+// no_builtin stops clang "optimising" these into calls to themselves
+__attribute__((no_builtin)) void *memset(void *dst, int c, u32 n)
+{
+    u8 *p = dst;
+    while (n--)
+        *p++ = c;
+    return dst;
+}
+
+__attribute__((no_builtin)) void *memcpy(void *dst, const void *src, u32 n)
+{
+    u8 *d = dst;
+    const u8 *s = src;
+    while (n--)
+        *d++ = *s++;
+    return dst;
+}
+
 void sound_off(void)
 {
     SND_VOLUME = 0;

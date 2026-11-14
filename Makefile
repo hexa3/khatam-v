@@ -8,7 +8,7 @@ CC      = clang
 LD      = ld.lld
 OBJCOPY = llvm-objcopy
 
-CFLAGS = --target=riscv32-unknown-elf -march=rv32e -mabi=ilp32e -Os -ffreestanding -nostdlib -mno-relax -Wall -Isdk
+CFLAGS = --target=riscv32-unknown-elf -march=rv32e -mabi=ilp32e -Os -ffreestanding -fno-builtin -nostdlib -mno-relax -Wall -Isdk
 
 all: build/$(GAME).bin build/$(GAME).hex
 
