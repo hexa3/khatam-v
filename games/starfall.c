@@ -64,7 +64,7 @@ static void set_level(int lv)
     for (int i = 0; i < 5; i++)
         GPU_PAL(i) = t[i];
     background(lv & 3, 0, 1);
-    bitmap(1, 600, 16, 2, t[3], digits[lv]);   // line colour always stands out
+    bitmap(1, 600, 16, 2, t[3], digits[lv % 10]);   // line colour always stands out
 }
 
 static void new_faller(int i)
@@ -171,7 +171,7 @@ int main(void)
         u32 b = buttons();
         if ((b & LEFT) && player_x > 4)
             player_x -= 6;
-        if ((b & RIGHT) && player_x < 640)
+        if ((b & RIGHT) && player_x < 640 - 36)
             player_x += 6;
         bitmap(0, player_x, PLAYER_Y, 2, 0x38, lantern);
 
