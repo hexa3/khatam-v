@@ -56,8 +56,21 @@ typedef unsigned char  u8;
 // note period for the sound registers (freq in Hz)
 #define NOTE(hz) (25000000 / 128 / (hz))
 
+// palette slots
+#define PAL_BG      0
+#define PAL_FILL    1
+#define PAL_FILL2   2
+#define PAL_LINE    3
+#define PAL_ACCENT  4
+
 // colour from 0-3 per channel
 #define RGB(r, g, b) (((r) << 4) | ((g) << 2) | (b))
+
+static inline void plain_background(int colour)
+{
+    GPU_PAL(PAL_BG) = colour;
+    GPU_PATTERN = 0;
+}
 
 static inline void shape(int n, int x, int y, int size, int kind, int colour)
 {

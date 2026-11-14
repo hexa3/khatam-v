@@ -1,6 +1,6 @@
 // Starfall - catch the falling stars
 //
-// buttons: ui_in[0] = left, ui_in[1] = right
+// buttons: ui_in[0] = left, ui_in[1] = right, ui_in[2] = start
 
 #include "khatam.h"
 
@@ -20,7 +20,8 @@ struct faller {
 };
 
 static struct faller fall[4];
-static int caught, lives = 3;
+static int player_x;
+static int caught, lives;
 
 // my own random for now
 static u32 seed;
@@ -52,17 +53,35 @@ static void draw_faller(int i)
         shape(i, fall[i].x, fall[i].y, 16, STAR, RGB(3, 3, 0));
 }
 
-int main(void)
+static void new_game(void)
 {
+    player_x = 304;
+    caught = 0;
+    lives = 3;
     GPU_PATTERN = STAR_CROSS | (1 << 4) | (1 << 5);
-
-    int player_x = 304;
     bitmap(0, player_x, 420, 2, RGB(3, 2, 0), lantern);
-
     for (int i = 0; i < 4; i++) {
         new_faller(i);
-        fall[i].y = -(i * 120);
+        fall[i].y = -(i * 120);   // spread them out at the start
     }
+}
+
+static void game_over(void)
+{
+    SND_VOLUME = 0;
+    for (int i = 0; i < 4; i++)
+        shape_off(i);
+    bitmap_off(0);
+
+    // red background until start is pressed
+    plain_background(RGB(2, 0, 0));
+    while (!(buttons() & 4))
+        wait_vblank();
+}
+
+int main(void)
+{
+    new_game();
 
     while (1) {
         wait_vblank();
@@ -83,6 +102,12 @@ int main(void)
                     caught++;
                 new_faller(i);
             }
+        }
+
+        if (lives == 0) {
+            game_over();
+            new_game();
+            continue;
         }
 
         u32 b = buttons();
