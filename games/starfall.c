@@ -43,6 +43,8 @@ struct faller {
 static struct faller fall[4];
 static int player_x;
 static int level, caught, lives;
+static int beep;    // frames left on the "caught" sound
+static int crash;   // frames left on the "hit a bomb" sound
 
 // my own random for now
 static u32 seed;
@@ -82,6 +84,24 @@ static void draw_faller(int i)
         shape(i, fall[i].x, fall[i].y, 12, OCTAGON, RGB(3, 0, 0));
     else
         shape(i, fall[i].x, fall[i].y, 16, STAR, RGB(3, 3, 0));
+}
+
+static void sounds(void)
+{
+    int vol0 = 0, noise = 0;
+
+    if (beep) {
+        SND_VOICE0 = NOTE(880 + 40 * beep);
+        vol0 = beep;
+        beep--;
+    }
+    if (crash) {
+        SND_NOISE = 8;
+        noise = crash;
+        crash--;
+    }
+
+    SND_VOLUME = vol0 | (noise << 8);
 }
 
 static void new_game(void)
@@ -127,10 +147,13 @@ int main(void)
                 // stars that touch each other count as a hit too, so only look near the bottom
                 if (!(hits & HIT_SPRITE(i)) || fall[i].y < 420 - 40)
                     continue;
-                if (fall[i].kind)
+                if (fall[i].kind) {
+                    crash = 15;
                     lives--;
-                else
+                } else {
+                    beep = 12;
                     caught++;
+                }
                 if (caught >= 10) {
                     caught = 0;
                     set_level(level + 1);
@@ -161,5 +184,7 @@ int main(void)
             else
                 shape_off(i);
         }
+
+        sounds();
     }
 }
