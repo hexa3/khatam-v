@@ -20,3 +20,16 @@ u32 __umodsi3(u32 n, u32 d)
 {
     return n - __udivsi3(n, d) * d;
 }
+
+// ...and no multiply either (yet)
+u32 __mulsi3(u32 a, u32 b)
+{
+    u32 r = 0;
+    while (b) {
+        if (b & 1)
+            r += a;
+        a <<= 1;
+        b >>= 1;
+    }
+    return r;
+}
