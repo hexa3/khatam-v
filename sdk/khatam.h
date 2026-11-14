@@ -66,6 +66,11 @@ typedef unsigned char  u8;
 // colour from 0-3 per channel
 #define RGB(r, g, b) (((r) << 4) | ((g) << 2) | (b))
 
+static inline void background(int pattern, int cell, int breathe)
+{
+    GPU_PATTERN = pattern | (cell << 2) | (breathe << 4) | (1 << 5);
+}
+
 static inline void plain_background(int colour)
 {
     GPU_PAL(PAL_BG) = colour;
@@ -91,6 +96,12 @@ static inline void bitmap(int n, int x, int y, int scale, int colour, const u8 *
     BITMAP_LO(n) = rows[0] | (rows[1] << 8) | (rows[2] << 16) | (rows[3] << 24);
     BITMAP_HI(n) = rows[4] | (rows[5] << 8) | (rows[6] << 16) | (rows[7] << 24);
     BITMAP_CTRL(n) = scale | (1 << 7) | (colour << 8);
+}
+
+static inline void bitmap_move(int n, int x, int y)
+{
+    BITMAP_X(n) = x;
+    BITMAP_Y(n) = y;
 }
 
 static inline void bitmap_off(int n)
