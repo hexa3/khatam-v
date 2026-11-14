@@ -1,8 +1,8 @@
 # build a game into a flash image
-#   make                -> build/hello.bin (write this to the flash at address 0)
+#   make                -> build/starfall.bin (write this to the flash at address 0)
 #   make GAME=mygame    -> games/mygame.c
 
-GAME ?= hello
+GAME ?= starfall
 
 CC      = clang
 LD      = ld.lld
