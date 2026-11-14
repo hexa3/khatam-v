@@ -144,6 +144,25 @@ module cpu (
     endcase
   end
 
+  // jumps, branches and auipc all share one pc adder
+  wire [31:0] pc_off = (opcode == OP_JAL) ? imm_j : (is_branch ? imm_b : imm_u);
+  wire [25:0] pc_imm = pc + pc_off[25:0];
+  wire [25:0] pc4    = pc + 26'd4;
+
+  // what EXEC puts in lo
+  reg [31:0] result;
+  always @(*) begin
+    case (opcode)
+      OP_LUI:          result = imm_u;
+      OP_AUIPC:        result = {6'd0, pc_imm};
+      OP_JAL, OP_JALR: result = {6'd0, pc4};
+      default:         result = alu;    // OP, OP-IMM
+    endcase
+  end
+
+  wire writes_rd = (opcode == OP_LUI) || (opcode == OP_AUIPC) || (opcode == OP_JAL) ||
+                   (opcode == OP_JALR) || (opcode == OP_IMM) || is_reg;
+
   // multiply (just the mul half of the M extension)
   // the * was massive, so now it's shift-add, one bit per clock:
   // hi += rs1 if the low bit of lo is set, then shift {hi,lo} right
@@ -195,6 +214,8 @@ module cpu (
         end
 
         EXEC: begin
+          lo <= result;
+
           if (opcode == OP_LOAD || opcode == OP_STORE) begin
             state <= MEM;
           end else if (is_mul) begin
@@ -203,27 +224,19 @@ module cpu (
             count <= 0;
             state <= MUL;
           end else begin
-            case (opcode)
-              OP_LUI:          lo <= imm_u;
-              OP_AUIPC:        lo <= {6'd0, pc} + imm_u;
-              OP_JAL, OP_JALR: lo <= {6'd0, pc + 26'd4};
-              default:         lo <= alu;
-            endcase
-            if (opcode == OP_JAL)
-              pc <= pc + imm_j[25:0];
-            else if (opcode == OP_BRANCH && take)
-              pc <= pc + imm_b[25:0];
+            if (opcode == OP_JAL || (is_branch && take))
+              pc <= pc_imm;
             else if (opcode == OP_JALR)
               pc <= (a[25:0] + imm_i[25:0]) & ~26'd1;
             else
-              pc <= pc + 4;
-            state <= (opcode == OP_BRANCH) ? FETCH : WB;
+              pc <= pc4;
+            state <= writes_rd ? WB : FETCH;   // fence, ecall, csr etc. just skip
           end
         end
 
         MEM: if (mem_done) begin
-          if (opcode == OP_STORE) begin
-            pc    <= pc + 4;
+          if (is_store) begin
+            pc    <= pc4;
             state <= FETCH;
           end else begin
             lo    <= load_val;
@@ -233,7 +246,7 @@ module cpu (
 
         WB: begin
           // register write happens in the always block up top
-          if (opcode == OP_LOAD || is_mul) pc <= pc + 4;   // the others moved pc in EXEC
+          if (opcode == OP_LOAD || is_mul) pc <= pc4;   // the others moved pc in EXEC
           state <= FETCH;
         end
 
