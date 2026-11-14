@@ -29,7 +29,7 @@ module cpu (
   reg [31:0] ir;
   reg [31:0] a;        // rs1
   reg [31:0] hi;       // rs2, then the high half of a multiply
-  reg [31:0] lo;       // result / low half of a multiply
+  reg [31:0] lo;       // result / memory address / low half of a multiply
   reg [31:0] yv;       // second ALU operand, already flipped if we're subtracting
   reg        sub;      // ...and whether we are
   reg [4:0]  count;
@@ -183,9 +183,9 @@ module cpu (
 
   // memory bus
   assign mem_req   = (state == FETCH) || (state == MEM);
-  assign mem_addr  = (state == FETCH) ? pc : sum[25:0];
+  assign mem_addr  = (state == FETCH) ? pc : lo[25:0];
   assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
-  assign mem_we    = (state == MEM) && (opcode == OP_STORE);
+  assign mem_we    = (state == MEM) && is_store;
   assign mem_wdata = b;
 
   reg [31:0] load_val;
@@ -227,6 +227,7 @@ module cpu (
           lo <= result;
 
           if (opcode == OP_LOAD || opcode == OP_STORE) begin
+            lo    <= sum;                 // the address (alu would pick by f3, which is the size here)
             state <= MEM;
           end else if (is_mul) begin
             hi    <= 0;
