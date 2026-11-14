@@ -16,12 +16,16 @@ build/%.o: games/%.c sdk/khatam.h
 	mkdir -p build
 	$(CC) $(CFLAGS) -c $< -o $@
 
+build/sdk.o: sdk/khatam.c sdk/khatam.h
+	mkdir -p build
+	$(CC) $(CFLAGS) -c $< -o $@
+
 build/crt0.o: sdk/crt0.S
 	mkdir -p build
 	$(CC) $(CFLAGS) -c $< -o $@
 
-build/$(GAME).elf: build/crt0.o build/$(GAME).o sdk/link.ld
-	$(LD) -T sdk/link.ld build/crt0.o build/$(GAME).o -o $@
+build/$(GAME).elf: build/crt0.o build/$(GAME).o build/sdk.o sdk/link.ld
+	$(LD) -T sdk/link.ld build/crt0.o build/$(GAME).o build/sdk.o -o $@
 
 build/$(GAME).bin: build/$(GAME).elf
 	$(OBJCOPY) -O binary $< $@
