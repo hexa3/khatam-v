@@ -13,18 +13,22 @@ module cpu (
     input  wire        mem_done
 );
 
-  localparam FETCH = 3'd0;
-  localparam EXEC  = 3'd1;
-  localparam MEM   = 3'd2;
-  localparam MUL   = 3'd3;
-  localparam FIX0  = 3'd4;
-  localparam FIX1  = 3'd5;
-  localparam FIX2  = 3'd6;
+  localparam FETCH = 4'd0;
+  localparam RS1   = 4'd1;
+  localparam RS2   = 4'd2;
+  localparam EXEC  = 4'd3;
+  localparam MEM   = 4'd4;
+  localparam MUL   = 4'd5;
+  localparam FIX0  = 4'd6;
+  localparam FIX1  = 4'd7;
+  localparam FIX2  = 4'd8;
 
-  reg [2:0]  state;
+  reg [3:0]  state;
   reg [25:0] pc;
   reg [31:0] ir;
-  reg [31:0] hi, lo;   // multiply
+  reg [31:0] a;        // rs1
+  reg [31:0] hi;       // rs2, then the high half of a multiply
+  reg [31:0] lo;       // low half of a multiply
   reg [4:0]  count;
 
   reg [31:0] regs [1:15];
@@ -54,11 +58,13 @@ module cpu (
   localparam OP_REG    = 7'b0110011;
 
   // register file, x0 is always 0
-  wire [31:0] rs1_val = (rs1 == 0) ? 32'd0 : regs[rs1];
-  wire [31:0] rs2_val = (rs2 == 0) ? 32'd0 : regs[rs2];
+  // one read port: rs1 in RS1, rs2 everywhere else
+  wire [3:0]  rsel = (state == RS1) ? rs1 : rs2;
+  wire [31:0] rval = (rsel == 0) ? 32'd0 : regs[rsel];
 
   // ALU
-  wire [31:0] b_in = (opcode == OP_REG || opcode == OP_BRANCH) ? rs2_val :
+  wire [31:0] b = hi;   // rs2
+  wire [31:0] b_in = (opcode == OP_REG || opcode == OP_BRANCH) ? b :
                      (opcode == OP_STORE ? imm_s : imm_i);
 
   // one adder for everything: add, sub, compares, addresses
@@ -68,12 +74,12 @@ module cpu (
   wire [31:0] yv     = do_sub ? ~b_in : b_in;
   wire [31:0] sum;
   wire        carry;
-  adder alu_add (.x(rs1_val), .y(yv), .cin(do_sub), .s(sum), .cout(carry));
+  adder alu_add (.x(a), .y(yv), .cin(do_sub), .s(sum), .cout(carry));
 
   // compares are a subtract, so the real operand is ~yv
-  wire eq  = ((rs1_val ^ yv) == 32'hffffffff);
+  wire eq  = ((a ^ yv) == 32'hffffffff);
   wire ltu = ~carry;                                      // no carry out = it borrowed
-  wire lt  = (rs1_val[31] == yv[31]) ? rs1_val[31] : ltu; // signs differ -> less if rs1 is negative
+  wire lt  = (a[31] == yv[31]) ? a[31] : ltu; // signs differ -> less if rs1 is negative
 
   // one shifter does all three: for a left shift, flip the bits around,
   // shift right, and flip them back
@@ -83,12 +89,12 @@ module cpu (
   genvar k;
   generate
     for (k = 0; k < 32; k = k + 1) begin : rev
-      assign a_rev[k]  = rs1_val[31 - k];
+      assign a_rev[k]  = a[31 - k];
       assign sh_rev[k] = sh_out[31 - k];
     end
   endgenerate
-  wire [31:0] sh_in   = left ? a_rev : rs1_val;
-  wire        sh_fill = ir[30] & rs1_val[31] & ~left;      // sign bit for SRA
+  wire [31:0] sh_in   = left ? a_rev : a;
+  wire        sh_fill = ir[30] & a[31] & ~left;      // sign bit for SRA
   wire [63:0] sh_wide = {{32{sh_fill}}, sh_in} >> shamt;
   assign      sh_out  = sh_wide[31:0];
   wire [31:0] shifted = left ? sh_rev : sh_out;
@@ -100,10 +106,10 @@ module cpu (
       3'b001:  alu = shifted;
       3'b010:  alu = {31'd0, lt};
       3'b011:  alu = {31'd0, ltu};
-      3'b100:  alu = rs1_val ^ b_in;
+      3'b100:  alu = a ^ b_in;
       3'b101:  alu = shifted;
-      3'b110:  alu = rs1_val | b_in;
-      default: alu = rs1_val & b_in;
+      3'b110:  alu = a | b_in;
+      default: alu = a & b_in;
     endcase
   end
 
@@ -128,14 +134,14 @@ module cpu (
   // FIX0: hi -= rs2 if rs1 was negative    (MULH, MULHSU)
   // FIX1: hi -= rs1 if rs2 was negative    (MULH)
   wire        is_mul = (opcode == OP_REG) && (f7 == 7'b0000001);
-  wire [32:0] hi_add = hi + (lo[0] ? rs1_val : 32'd0);
+  wire [32:0] hi_add = hi + (lo[0] ? a : 32'd0);
 
   // memory bus
   assign mem_req   = (state == FETCH) || (state == MEM);
   assign mem_addr  = (state == FETCH) ? pc : sum[25:0];
   assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
   assign mem_we    = (state == MEM) && (opcode == OP_STORE);
-  assign mem_wdata = rs2_val;
+  assign mem_wdata = b;
 
   reg [31:0] load_val;
   always @(*) begin
@@ -157,6 +163,16 @@ module cpu (
 
         FETCH: if (mem_done) begin
           ir    <= mem_rdata;
+          state <= RS1;
+        end
+
+        RS1: begin
+          a     <= rval;
+          state <= RS2;
+        end
+
+        RS2: begin
+          hi    <= rval;
           state <= EXEC;
         end
 
@@ -165,7 +181,7 @@ module cpu (
             state <= MEM;
           end else if (is_mul) begin
             hi    <= 0;
-            lo    <= rs2_val;
+            lo    <= b;
             count <= 0;
             state <= MUL;
           end else begin
@@ -184,7 +200,7 @@ module cpu (
               else if (opcode == OP_BRANCH && take)
                 pc <= pc + imm_b[25:0];
               else if (opcode == OP_JALR)
-                pc <= (rs1_val[25:0] + imm_i[25:0]) & ~26'd1;
+                pc <= (a[25:0] + imm_i[25:0]) & ~26'd1;
               else
                 pc <= pc + 4;
               state <= FETCH;
@@ -215,14 +231,14 @@ module cpu (
         end
 
         FIX0: begin
-          if (rs1_val[31] && (f3[1:0] == 2'b01 || f3[1:0] == 2'b10))
-            hi <= hi - rs2_val;
+          if (a[31] && (f3[1:0] == 2'b01 || f3[1:0] == 2'b10))
+            hi <= hi - rval;              // rs2 again, hi doesn't have it any more
           state <= FIX1;
         end
 
         FIX1: begin
-          if (rs2_val[31] && f3[1:0] == 2'b01)
-            hi <= hi - rs1_val;
+          if (rval[31] && f3[1:0] == 2'b01)
+            hi <= hi - a;
           state <= FIX2;
         end
 
