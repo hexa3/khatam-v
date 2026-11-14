@@ -231,14 +231,14 @@ module cpu (
             state <= MEM;
           end else if (is_mul) begin
             hi    <= 0;
-            lo    <= b;
+            lo    <= b;                   // multiplier
             count <= 0;
             state <= MUL;
           end else begin
             if (opcode == OP_JAL || (is_branch && take))
               pc <= pc_imm;
             else if (opcode == OP_JALR)
-              pc <= (a[25:0] + imm_i[25:0]) & ~26'd1;
+              pc <= sum[25:0] & ~26'd1;
             else
               pc <= pc4;
             state <= writes_rd ? WB : FETCH;   // fence, ecall, csr etc. just skip
