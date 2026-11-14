@@ -121,4 +121,7 @@ static inline void wait_vblank(void)
         ;
 }
 
+void sound_off(void);
+u32  random(void);
+
 #endif

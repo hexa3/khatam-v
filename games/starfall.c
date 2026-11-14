@@ -52,20 +52,6 @@ static int level, caught, lives;
 static int beep;    // frames left on the "caught" sound
 static int crash;   // frames left on the "hit a bomb" sound
 
-// my own random for now
-static u32 seed;
-
-static u32 random(void)
-{
-    // seeded from the frame counter + beam position the first time
-    if (seed == 0)
-        seed = (FRAME << 10) ^ LINE ^ 0x5eed;
-    seed ^= seed << 13;
-    seed ^= seed >> 17;
-    seed ^= seed << 5;
-    return seed;
-}
-
 static void set_level(int lv)
 {
     level = lv;
@@ -130,7 +116,7 @@ static void new_game(void)
 
 static void game_over(void)
 {
-    SND_VOLUME = 0;
+    sound_off();
     for (int i = 0; i < 4; i++)
         shape_off(i);
     bitmap_off(0);
