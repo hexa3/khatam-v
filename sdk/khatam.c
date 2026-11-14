@@ -21,6 +21,18 @@ u32 __umodsi3(u32 n, u32 d)
     return n - __udivsi3(n, d) * d;
 }
 
+int __divsi3(int n, int d)
+{
+    int neg = (n < 0) != (d < 0);
+    u32 q = __udivsi3(n < 0 ? -n : n, d < 0 ? -d : d);
+    return neg ? -(int)q : (int)q;
+}
+
+int __modsi3(int n, int d)
+{
+    return n - __divsi3(n, d) * d;
+}
+
 // ...and no multiply either (yet)
 u32 __mulsi3(u32 a, u32 b)
 {
