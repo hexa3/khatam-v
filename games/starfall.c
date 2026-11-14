@@ -16,11 +16,11 @@ static const u8 lantern[8] = {
 };
 
 struct faller {
-    int x, y, speed;
+    int x, y, speed, kind;  // kind 0 = star (good), 1 = bomb
 };
 
 static struct faller fall[4];
-static int caught;
+static int caught, lives = 3;
 
 // my own random for now
 static u32 seed;
@@ -41,6 +41,15 @@ static void new_faller(int i)
     fall[i].x = 40 + random() % 560;
     fall[i].y = 0;
     fall[i].speed = 1 + random() % 3;
+    fall[i].kind = (random() % 4 == 0);   // 1 in 4 is a bomb
+}
+
+static void draw_faller(int i)
+{
+    if (fall[i].kind)
+        shape(i, fall[i].x, fall[i].y, 12, OCTAGON, RGB(3, 0, 0));
+    else
+        shape(i, fall[i].x, fall[i].y, 16, STAR, RGB(3, 3, 0));
 }
 
 int main(void)
@@ -65,10 +74,13 @@ int main(void)
 
         if (hits & HIT_SPRITE(4)) {
             for (int i = 0; i < 4; i++) {
-                if (hits & HIT_SPRITE(i)) {
+                if (!(hits & HIT_SPRITE(i)))
+                    continue;
+                if (fall[i].kind)
+                    lives--;
+                else
                     caught++;
-                    new_faller(i);
-                }
+                new_faller(i);
             }
         }
 
@@ -84,7 +96,7 @@ int main(void)
             if (fall[i].y > 480 + 16)
                 new_faller(i);
             if (fall[i].y >= 0)
-                shape(i, fall[i].x, fall[i].y, 16, STAR, RGB(3, 3, 0));
+                draw_faller(i);
             else
                 shape_off(i);
         }
