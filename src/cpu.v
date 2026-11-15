@@ -13,13 +13,17 @@ module cpu (
     input  wire        mem_done
 );
 
-  localparam FETCH = 2'd0;
-  localparam EXEC  = 2'd1;
-  localparam MEM   = 2'd2;
+  localparam FETCH = 3'd0;
+  localparam RS1   = 3'd1;
+  localparam RS2   = 3'd2;
+  localparam EXEC  = 3'd3;
+  localparam MEM   = 3'd4;
 
-  reg [1:0]  state;
+  reg [2:0]  state;
   reg [25:0] pc;                 // 64 MB of address space is plenty
   reg [31:0] ir;
+  reg [31:0] a;                  // rs1
+  reg [31:0] rs2v;               // rs2
   reg [31:0] regs [1:15];   // x0 is always 0 so it doesnt need a register
 
   wire [6:0] opcode = ir[6:0];
@@ -44,8 +48,9 @@ module cpu (
   localparam OP_IMM   = 7'b0010011;
   localparam OP_REG   = 7'b0110011;
 
-  wire [31:0] a    = (rs1 == 0) ? 32'd0 : regs[rs1];
-  wire [31:0] rv2  = (rs2 == 0) ? 32'd0 : regs[rs2];
+  // the register file only has one read port: rs1 in RS1, rs2 in RS2
+  wire [3:0]  rsel = (state == RS1) ? rs1 : rs2;
+  wire [31:0] rval = (rsel == 0) ? 32'd0 : regs[rsel];
 
   wire is_reg    = (opcode == OP_REG);
   wire is_branch = (opcode == OP_BRANCH);
@@ -53,7 +58,7 @@ module cpu (
   wire is_mul    = is_reg && ir[25];
 
   // second operand: rs2 for register ops and branches, otherwise an immediate
-  wire [31:0] b = (is_reg || is_branch) ? rv2 : (is_store ? imm_s : imm_i);
+  wire [31:0] b = (is_reg || is_branch) ? rs2v : (is_store ? imm_s : imm_i);
 
   // one adder for everything: add, sub, compares, addresses
   // subtract = add the inverted number + 1
@@ -77,7 +82,7 @@ module cpu (
   assign mem_req   = (state == FETCH) || (state == MEM);
   assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
   assign mem_we    = (state == MEM) && is_store;
-  assign mem_wdata = rv2;
+  assign mem_wdata = rs2v;
 
   reg [31:0] load_val;
   always @(*) begin
@@ -143,6 +148,16 @@ module cpu (
       case (state)
         FETCH: if (mem_done) begin
           ir    <= mem_rdata;
+          state <= RS1;
+        end
+
+        RS1: begin
+          a     <= rval;
+          state <= RS2;
+        end
+
+        RS2: begin
+          rs2v  <= rval;
           state <= EXEC;
         end
 
