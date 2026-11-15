@@ -73,7 +73,9 @@ module cpu (
   wire [31:0] sra = sa >>> shamt;
   reg  [31:0] alu;
   always @(*) begin
-    case (f3)
+    if (opcode == OP_REG && ir[25])
+      alu = a * b;      // MUL (just the low 32 bits for now)
+    else case (f3)
       3'b000:  alu = (opcode == OP_REG && ir[30]) ? a - b : a + b;
       3'b001:  alu = a << shamt;
       3'b010:  alu = ($signed(a) < $signed(b)) ? 1 : 0;
