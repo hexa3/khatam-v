@@ -13,15 +13,18 @@ module cpu (
     input  wire        mem_done
 );
 
-  localparam FETCH = 3'd0;
-  localparam RS1   = 3'd1;
-  localparam RS2   = 3'd2;
-  localparam EXEC  = 3'd3;
-  localparam MEM   = 3'd4;
-  localparam WB    = 3'd5;
-  localparam MUL   = 3'd6;
+  localparam FETCH = 4'd0;
+  localparam RS1   = 4'd1;
+  localparam RS2   = 4'd2;
+  localparam EXEC  = 4'd3;
+  localparam MEM   = 4'd4;
+  localparam WB    = 4'd5;
+  localparam MUL   = 4'd6;
+  localparam FIX0  = 4'd7;
+  localparam FIX1  = 4'd8;
+  localparam FIX2  = 4'd9;
 
-  reg [2:0]  state;
+  reg [3:0]  state;
   reg [25:0] pc;                 // 64 MB of address space is plenty
   reg [31:0] ir;
   reg [31:0] a;                  // rs1
@@ -154,9 +157,23 @@ module cpu (
     endcase
   end
 
-  // multiply: hi += a if the low bit of lo is set, then shift {hi,lo} right
+  // multiply
+  // MUL:  hi += a if the low bit of lo is set, then shift {hi,lo} right
+  // FIX0: lo = rs2 (lo isn't needed any more for MULH*)
+  // FIX1: hi -= rs2 if rs1 was negative    (MULH, MULHSU)
+  // FIX2: lo = hi - rs1 if rs2 was negative (MULH)
+  wire        fix1_on = a[31] && (f3[1:0] == 2'b01 || f3[1:0] == 2'b10);
+  wire        fix2_on = lo[31] && (f3[1:0] == 2'b01);
+  reg  [31:0] addend;
+  always @(*) begin
+    case (state)
+      MUL:     addend = lo[0] ? a : 32'd0;
+      FIX1:    addend = fix1_on ? ~lo : 32'hffffffff;   // -rs2, or -0 (the +1 below fixes it)
+      default: addend = fix2_on ? ~a  : 32'hffffffff;   // -rs1
+    endcase
+  end
   wire [32:0] hi_add;
-  adder mul_add (.x(hi), .y(lo[0] ? a : 32'd0), .cin(1'b0), .s(hi_add[31:0]), .cout(hi_add[32]));
+  adder mul_add (.x(hi), .y(addend), .cin(state != MUL), .s(hi_add[31:0]), .cout(hi_add[32]));
 
   // what EXEC puts in lo
   reg [31:0] result;
@@ -241,7 +258,22 @@ module cpu (
           lo    <= {hi_add[0], lo[31:1]};
           count <= count + 1;
           if (count == 31)
-            state <= WB;
+            state <= (f3[1:0] == 2'b00) ? WB : FIX0;   // MUL wants lo, it's done
+        end
+
+        FIX0: begin
+          lo    <= rval;                  // rs2 again
+          state <= FIX1;
+        end
+
+        FIX1: begin
+          hi    <= hi_add[31:0];
+          state <= FIX2;
+        end
+
+        FIX2: begin
+          lo    <= hi_add[31:0];
+          state <= WB;
         end
 
         default: state <= FETCH;
