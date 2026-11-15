@@ -43,6 +43,9 @@ static const u8 themes[4][5] = {
     {RGB(0,0,0), RGB(1,0,1), RGB(2,0,2), RGB(3,3,3), RGB(3,0,3)}, // night
 };
 
+// falling star colour per level, picked so it doesn't blend into the pattern
+static const u8 star_colours[4] = {RGB(3,3,0), RGB(3,3,3), RGB(3,3,0), RGB(3,3,0)};
+
 // bass line, one note every 16 frames
 static const u16 bass[8] = {
     NOTE(110), NOTE(110), NOTE(131), NOTE(110),
@@ -82,7 +85,7 @@ static void draw_faller(int i)
     if (fall[i].kind)
         shape(i, fall[i].x, fall[i].y, 12, OCTAGON, RGB(3, 0, 0));
     else
-        shape(i, fall[i].x, fall[i].y, 16, STAR, RGB(3, 3, 0));
+        shape(i, fall[i].x, fall[i].y, 16, STAR, star_colours[level & 3]);
 }
 
 static void sounds(u32 frame)
