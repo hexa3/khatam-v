@@ -1,4 +1,20 @@
-// 32 bit adder, carry select
+/*
+ * 32 bit Kogge-Stone adder
+ *
+ * A normal "+" turns into a ripple carry adder, which on GF180 at the slow
+ * corner is ~20ns for 32 bits, half the clock. (I tried a carry-select adder
+ * first but yosys is clever and merged it straight back into a ripple.)
+ *
+ * Kogge-Stone works out every carry in log2(32) = 5 steps instead of 32:
+ *   g = "this bit makes a carry"      = x & y
+ *   p = "this bit passes a carry on"  = x ^ y
+ * then each step combines a bit with the one d places to its right
+ * (d = 1, 2, 4, 8, 16):
+ *   g[i] = g[i] | (p[i] & g[i-d])
+ *   p[i] = p[i] & p[i-d]
+ * after 5 steps g[i] is the carry out of bit i.
+ */
+
 `default_nettype none
 
 module adder (
@@ -9,26 +25,34 @@ module adder (
     output wire        cout
 );
 
-  // 4 blocks of 8 bits. every block adds with carry 0 and with carry 1 at the
-  // same time, then the carry coming in picks the right one
-  wire [3:0] c;           // carry into each block
-  assign c[0] = cin;
+  wire [31:0] p0 = x ^ y;
 
-  wire [8:0] r0 [0:3];
-  wire [8:0] r1 [0:3];
+  // fold the carry in into bit 0's generate
+  wire [31:0] g0 = (x & y) | {31'd0, p0[0] & cin};
 
-  genvar blk;
+  wire [31:0] g [0:5];
+  wire [31:0] p [0:5];
+  assign g[0] = g0;
+  assign p[0] = p0;
+
+  genvar lvl, i;
   generate
-    for (blk = 0; blk < 4; blk = blk + 1) begin : b
-      assign r0[blk] = x[8*blk +: 8] + y[8*blk +: 8];
-      assign r1[blk] = x[8*blk +: 8] + y[8*blk +: 8] + 9'd1;
-      assign s[8*blk +: 8] = c[blk] ? r1[blk][7:0] : r0[blk][7:0];
-      if (blk < 3) begin : nxt
-        assign c[blk+1] = c[blk] ? r1[blk][8] : r0[blk][8];
+    for (lvl = 0; lvl < 5; lvl = lvl + 1) begin : step
+      for (i = 0; i < 32; i = i + 1) begin : bits
+        if (i >= (1 << lvl)) begin : comb
+          assign g[lvl+1][i] = g[lvl][i] | (p[lvl][i] & g[lvl][i - (1 << lvl)]);
+          assign p[lvl+1][i] = p[lvl][i] & p[lvl][i - (1 << lvl)];
+        end else begin : pass
+          assign g[lvl+1][i] = g[lvl][i];
+          assign p[lvl+1][i] = p[lvl][i];
+        end
       end
     end
   endgenerate
 
-  assign cout = c[3] ? r1[3][8] : r0[3][8];
+  wire [31:0] carry = g[5];   // carry OUT of each bit
+
+  assign s    = p0 ^ {carry[30:0], cin};
+  assign cout = carry[31];
 
 endmodule
