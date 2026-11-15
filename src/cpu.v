@@ -24,6 +24,8 @@ module cpu (
   reg [31:0] ir;
   reg [31:0] a;                  // rs1
   reg [31:0] rs2v;               // rs2
+  reg [31:0] yv;                 // second alu operand, already flipped if we're subtracting
+  reg        sub;                // ...and whether we are
   reg [31:0] regs [1:15];   // x0 is always 0 so it doesnt need a register
 
   wire [6:0] opcode = ir[6:0];
@@ -57,25 +59,26 @@ module cpu (
   wire is_store  = (opcode == OP_STORE);
   wire is_mul    = is_reg && ir[25];
 
-  // second operand: rs2 for register ops and branches, otherwise an immediate
-  wire [31:0] b = (is_reg || is_branch) ? rs2v : (is_store ? imm_s : imm_i);
+  // second operand: rs2 for register ops and branches, otherwise an immediate.
+  // this all gets worked out in RS2 and latched into yv, already inverted if
+  // it's a subtract, so EXEC can start adding straight away (GF180 is slow!)
+  wire [31:0] y_next = (is_reg || is_branch) ? rval : (is_store ? imm_s : imm_i);
 
   // one adder for everything: add, sub, compares, addresses
   // subtract = add the inverted number + 1
   wire is_alu = is_reg || (opcode == OP_IMM);
   wire is_cmp = is_alu && (f3 == 3'b010 || f3 == 3'b011);   // SLT, SLTU
   wire do_sub = is_branch || is_cmp || (is_reg && f3 == 3'b000 && ir[30]);
-  wire [31:0] yv = do_sub ? ~b : b;
   wire [31:0] sum;
   wire        carry;
-  adder alu_add (.x(a), .y(yv), .cin(do_sub), .s(sum), .cout(carry));
+  adder alu_add (.x(a), .y(yv), .cin(sub), .s(sum), .cout(carry));
 
-  // compares only happen with do_sub, so the real operand is b
-  wire eq  = (a == b);
-  wire ltu = ~carry;                              // no carry out = it borrowed
-  wire lt  = (a[31] == b[31]) ? ltu : a[31];      // signs differ -> a is less if a is negative
+  // compares only happen when sub = 1, so the real operand is ~yv
+  wire eq  = ((a ^ yv) == 32'hffffffff);
+  wire ltu = ~carry;                                      // no carry out = it borrowed
+  wire lt  = (a[31] == yv[31]) ? a[31] : ltu;             // signs differ -> a is less if a is negative
 
-  wire [31:0] y = yv;   // for and/or/xor/shifts (never a subtract)
+  wire [31:0] y = yv;   // for and/or/xor/shifts (never a subtract, so not inverted)
 
   // loads and stores
   assign mem_addr  = (state == MEM) ? sum[25:0] : pc;
@@ -158,6 +161,8 @@ module cpu (
 
         RS2: begin
           rs2v  <= rval;
+          yv    <= do_sub ? ~y_next : y_next;
+          sub   <= do_sub;
           state <= EXEC;
         end
 
@@ -181,7 +186,7 @@ module cpu (
               pc       <= sum[25:0] & ~26'd1;   // jalr clears bit 0
             end
             OP_BRANCH: if (take) pc <= pc + imm_b;
-            OP_IMM, OP_REG: regs[rd] <= is_mul ? a * b : alu;
+            OP_IMM, OP_REG: regs[rd] <= is_mul ? a * rs2v : alu;
           endcase
         end
 
