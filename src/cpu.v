@@ -175,13 +175,18 @@ module cpu (
   wire [32:0] hi_add;
   adder mul_add (.x(hi), .y(addend), .cin(state != MUL), .s(hi_add[31:0]), .cout(hi_add[32]));
 
+  // jumps, branches and auipc all share one pc adder
+  wire [31:0] pc_off = (opcode == OP_JAL) ? imm_j : (is_branch ? imm_b : imm_u);
+  wire [25:0] pc_imm = pc + pc_off[25:0];
+  wire [25:0] pc4    = pc + 26'd4;
+
   // what EXEC puts in lo
   reg [31:0] result;
   always @(*) begin
     case (opcode)
       OP_LUI:          result = imm_u;
-      OP_AUIPC:        result = pc + imm_u;
-      OP_JAL, OP_JALR: result = pc + 4;
+      OP_AUIPC:        result = {6'd0, pc_imm};
+      OP_JAL, OP_JALR: result = {6'd0, pc4};
       default:         result = alu;    // OP, OP-IMM
     endcase
   end
@@ -224,21 +229,19 @@ module cpu (
             count <= 0;
             state <= MUL;
           end else begin
-            if (opcode == OP_JAL)
-              pc <= pc + imm_j;
-            else if (is_branch && take)
-              pc <= pc + imm_b;
+            if (opcode == OP_JAL || (is_branch && take))
+              pc <= pc_imm;
             else if (opcode == OP_JALR)
-              pc <= sum[25:0] & ~26'd1;   // jalr clears bit 0
+              pc <= sum[25:0] & ~26'd1;
             else
-              pc <= pc + 4;
+              pc <= pc4;
             state <= writes_rd ? WB : FETCH;   // fence, ecall, csr etc. just skip
           end
         end
 
         MEM: if (mem_done) begin
           if (is_store) begin
-            pc    <= pc + 4;
+            pc    <= pc4;
             state <= FETCH;
           end else begin
             lo    <= load_val;
@@ -248,7 +251,7 @@ module cpu (
 
         WB: begin
           // register write happens in the always block up top
-          if (opcode == OP_LOAD || is_mul) pc <= pc + 4;   // the others moved pc in EXEC
+          if (opcode == OP_LOAD || is_mul) pc <= pc4;   // the others moved pc in EXEC
           state <= FETCH;
         end
 
