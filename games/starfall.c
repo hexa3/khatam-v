@@ -4,6 +4,13 @@
 
 #include "khatam.h"
 
+#define LEFT   1
+#define RIGHT  2
+#define START  4
+
+#define PLAYER_Y  420
+#define NUM_FALL  4
+
 static const u8 lantern[8] = {
     0x18, // ...##...
     0x3c, // ..####..
@@ -46,7 +53,7 @@ struct faller {
     int x, y, speed, kind;  // kind 0 = star (good), 1 = bomb
 };
 
-static struct faller fall[4];
+static struct faller fall[NUM_FALL];
 static int player_x;
 static int level, caught, lives;
 static int beep;    // frames left on the "caught" sound
@@ -107,8 +114,8 @@ static void new_game(void)
     caught = 0;
     lives = 3;
     set_level(0);
-    bitmap(0, player_x, 420, 2, RGB(3, 2, 0), lantern);
-    for (int i = 0; i < 4; i++) {
+    bitmap(0, player_x, PLAYER_Y, 2, RGB(3, 2, 0), lantern);
+    for (int i = 0; i < NUM_FALL; i++) {
         new_faller(i);
         fall[i].y = -(i * 120);   // spread them out at the start
     }
@@ -117,13 +124,13 @@ static void new_game(void)
 static void game_over(void)
 {
     sound_off();
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < NUM_FALL; i++)
         shape_off(i);
     bitmap_off(0);
 
     // red background until start is pressed
     plain_background(RGB(2, 0, 0));
-    while (!(buttons() & 4))
+    while (!(buttons() & START))
         wait_vblank();
 }
 
@@ -141,9 +148,9 @@ int main(void)
         GPU_PAL(0) = hits ? RGB(3, 0, 0) : RGB(3, 3, 3);   // debug: flash when something hits
 
         if (hits & HIT_SPRITE(4)) {
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < NUM_FALL; i++) {
                 // stars that touch each other count as a hit too, so only look near the bottom
-                if (!(hits & HIT_SPRITE(i)) || fall[i].y < 420 - 40)
+                if (!(hits & HIT_SPRITE(i)) || fall[i].y < PLAYER_Y - 40)
                     continue;
                 if (fall[i].kind) {
                     crash = 15;
@@ -167,13 +174,13 @@ int main(void)
         }
 
         u32 b = buttons();
-        if ((b & 1) && player_x > 4)
+        if ((b & LEFT) && player_x > 4)
             player_x -= 6;
-        if ((b & 2) && player_x < 604)
+        if ((b & RIGHT) && player_x < 640 - 36)
             player_x += 6;
         bitmap_move(0, player_x, 420);
 
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < NUM_FALL; i++) {
             fall[i].y += fall[i].speed;
             if (fall[i].y > 480 + 16)
                 new_faller(i);
