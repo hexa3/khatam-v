@@ -18,12 +18,14 @@ module cpu (
   localparam RS2   = 3'd2;
   localparam EXEC  = 3'd3;
   localparam MEM   = 3'd4;
+  localparam WB    = 3'd5;
 
   reg [2:0]  state;
   reg [25:0] pc;                 // 64 MB of address space is plenty
   reg [31:0] ir;
   reg [31:0] a;                  // rs1
   reg [31:0] rs2v;               // rs2
+  reg [31:0] lo;                 // result / memory address
   reg [31:0] yv;                 // second alu operand, already flipped if we're subtracting
   reg        sub;                // ...and whether we are
   reg [31:0] regs [1:15];   // x0 is always 0 so it doesnt need a register
@@ -80,8 +82,13 @@ module cpu (
 
   wire [31:0] y = yv;   // for and/or/xor/shifts (never a subtract, so not inverted)
 
+  // one write port, always from lo
+  always @(posedge clk) begin
+    if (state == WB && rd != 0) regs[rd] <= lo;
+  end
+
   // loads and stores
-  assign mem_addr  = (state == MEM) ? sum[25:0] : pc;
+  assign mem_addr  = (state == FETCH) ? pc : lo[25:0];
   assign mem_req   = (state == FETCH) || (state == MEM);
   assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
   assign mem_we    = (state == MEM) && is_store;
@@ -143,6 +150,20 @@ module cpu (
     endcase
   end
 
+  // what EXEC puts in lo
+  reg [31:0] result;
+  always @(*) begin
+    case (opcode)
+      OP_LUI:          result = imm_u;
+      OP_AUIPC:        result = pc + imm_u;
+      OP_JAL, OP_JALR: result = pc + 4;
+      default:         result = is_mul ? a * rs2v : alu;    // OP, OP-IMM
+    endcase
+  end
+
+  wire writes_rd = (opcode == OP_LUI) || (opcode == OP_AUIPC) || (opcode == OP_JAL) ||
+                   (opcode == OP_JALR) || (opcode == OP_IMM) || is_reg;
+
   always @(posedge clk) begin
     if (!rst_n) begin
       state <= FETCH;
@@ -167,35 +188,41 @@ module cpu (
         end
 
         EXEC: begin
-          pc    <= pc + 4;
-          state <= FETCH;
+          lo <= result;
 
-          case (opcode)
-            OP_LOAD, OP_STORE: begin
-              pc    <= pc;
-              state <= MEM;
-            end
-            OP_LUI:   regs[rd] <= imm_u;
-            OP_AUIPC: regs[rd] <= pc + imm_u;
-            OP_JAL: begin
-              regs[rd] <= pc + 4;
-              pc       <= pc + imm_j;
-            end
-            OP_JALR: begin
-              regs[rd] <= pc + 4;
-              pc       <= sum[25:0] & ~26'd1;   // jalr clears bit 0
-            end
-            OP_BRANCH: if (take) pc <= pc + imm_b;
-            OP_IMM, OP_REG: regs[rd] <= is_mul ? a * rs2v : alu;
-          endcase
+          if (opcode == OP_LOAD || opcode == OP_STORE) begin
+            lo    <= sum;                 // the address (alu would pick by f3, which is the size here)
+            state <= MEM;
+          end else begin
+            if (opcode == OP_JAL)
+              pc <= pc + imm_j;
+            else if (is_branch && take)
+              pc <= pc + imm_b;
+            else if (opcode == OP_JALR)
+              pc <= sum[25:0] & ~26'd1;   // jalr clears bit 0
+            else
+              pc <= pc + 4;
+            state <= writes_rd ? WB : FETCH;   // fence, ecall, csr etc. just skip
+          end
         end
 
         MEM: if (mem_done) begin
-          if (opcode == OP_LOAD)
-            regs[rd] <= load_val;
-          pc    <= pc + 4;
+          if (is_store) begin
+            pc    <= pc + 4;
+            state <= FETCH;
+          end else begin
+            lo    <= load_val;
+            state <= WB;
+          end
+        end
+
+        WB: begin
+          // register write happens in the always block up top
+          if (opcode == OP_LOAD) pc <= pc + 4;   // the others moved pc in EXEC
           state <= FETCH;
         end
+
+        default: state <= FETCH;
       endcase
     end
   end
