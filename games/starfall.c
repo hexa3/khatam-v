@@ -145,7 +145,6 @@ int main(void)
         // collisions from last frame
         u32 hits = COLLIDE;
         COLLIDE = 0;
-        GPU_PAL(0) = hits ? RGB(3, 0, 0) : RGB(3, 3, 3);   // debug: flash when something hits
 
         if (hits & HIT_SPRITE(4)) {
             for (int i = 0; i < NUM_FALL; i++) {
