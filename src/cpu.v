@@ -46,14 +46,37 @@ module cpu (
 
   wire [31:0] a    = (rs1 == 0) ? 32'd0 : regs[rs1];
   wire [31:0] rv2  = (rs2 == 0) ? 32'd0 : regs[rs2];
-  wire [31:0] b = (opcode == OP_REG || opcode == OP_BRANCH) ? rv2 : imm_i;
+
+  wire is_reg    = (opcode == OP_REG);
+  wire is_branch = (opcode == OP_BRANCH);
+  wire is_store  = (opcode == OP_STORE);
+  wire is_mul    = is_reg && ir[25];
+
+  // second operand: rs2 for register ops and branches, otherwise an immediate
+  wire [31:0] b = (is_reg || is_branch) ? rv2 : (is_store ? imm_s : imm_i);
+
+  // one adder for everything: add, sub, compares, addresses
+  // subtract = add the inverted number + 1
+  wire is_alu = is_reg || (opcode == OP_IMM);
+  wire is_cmp = is_alu && (f3 == 3'b010 || f3 == 3'b011);   // SLT, SLTU
+  wire do_sub = is_branch || is_cmp || (is_reg && f3 == 3'b000 && ir[30]);
+  wire [31:0] yv    = do_sub ? ~b : b;
+  wire [32:0] sum33 = {1'b0, a} + {1'b0, yv} + {32'd0, do_sub};
+  wire [31:0] sum   = sum33[31:0];
+  wire        carry = sum33[32];
+
+  // compares only happen with do_sub, so the real operand is b
+  wire eq  = (a == b);
+  wire ltu = ~carry;                              // no carry out = it borrowed
+  wire lt  = (a[31] == b[31]) ? ltu : a[31];      // signs differ -> a is less if a is negative
+
+  wire [31:0] y = yv;   // for and/or/xor/shifts (never a subtract)
 
   // loads and stores
-  wire [31:0] addr = a + ((opcode == OP_STORE) ? imm_s : imm_i);
-  assign mem_addr  = (state == MEM) ? addr : pc;
+  assign mem_addr  = (state == MEM) ? sum[25:0] : pc;
   assign mem_req   = (state == FETCH) || (state == MEM);
   assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
-  assign mem_we    = (state == MEM) && (opcode == OP_STORE);
+  assign mem_we    = (state == MEM) && is_store;
   assign mem_wdata = rv2;
 
   reg [31:0] load_val;
@@ -67,35 +90,47 @@ module cpu (
     endcase
   end
 
-  // alu, one thing for each instruction
-  wire [4:0] shamt = b[4:0];
-  wire signed [31:0] sa = a;
-  wire [31:0] sra = sa >>> shamt;
-  reg  [31:0] alu;
+  // one shifter does all three: for a left shift, flip the bits around,
+  // shift right, and flip them back
+  wire [4:0]  shamt   = y[4:0];
+  wire        left    = (f3 == 3'b001);
+  wire [31:0] a_rev, sh_rev, sh_out;
+  genvar k;
+  generate
+    for (k = 0; k < 32; k = k + 1) begin : rev
+      assign a_rev[k]  = a[31 - k];
+      assign sh_rev[k] = sh_out[31 - k];
+    end
+  endgenerate
+  wire [31:0] sh_in   = left ? a_rev : a;
+  wire        sh_fill = ir[30] & a[31] & ~left;            // sign bit for SRA
+  wire [63:0] sh_wide = {{32{sh_fill}}, sh_in} >> shamt;
+  assign      sh_out  = sh_wide[31:0];
+  wire [31:0] shifted = left ? sh_rev : sh_out;
+
+  reg [31:0] alu;
   always @(*) begin
-    if (opcode == OP_REG && ir[25])
-      alu = a * b;      // MUL (just the low 32 bits for now)
-    else case (f3)
-      3'b000:  alu = (opcode == OP_REG && ir[30]) ? a - b : a + b;
-      3'b001:  alu = a << shamt;
-      3'b010:  alu = ($signed(a) < $signed(b)) ? 1 : 0;
-      3'b011:  alu = (a < b) ? 1 : 0;
-      3'b100:  alu = a ^ b;
-      3'b101:  alu = ir[30] ? sra : (a >> shamt);
-      3'b110:  alu = a | b;
-      default: alu = a & b;
+    case (f3)
+      3'b000:  alu = sum;
+      3'b001:  alu = shifted;
+      3'b010:  alu = {31'd0, lt};
+      3'b011:  alu = {31'd0, ltu};
+      3'b100:  alu = a ^ y;
+      3'b101:  alu = shifted;
+      3'b110:  alu = a | y;
+      default: alu = a & y;
     endcase
   end
 
   reg take;
   always @(*) begin
     case (f3)
-      3'b000:  take = (a == b);
-      3'b001:  take = (a != b);
-      3'b100:  take = ($signed(a) < $signed(b));
-      3'b101:  take = ($signed(a) >= $signed(b));
-      3'b110:  take = (a < b);
-      3'b111:  take = (a >= b);
+      3'b000:  take = eq;
+      3'b001:  take = !eq;
+      3'b100:  take = lt;
+      3'b101:  take = !lt;
+      3'b110:  take = ltu;
+      3'b111:  take = !ltu;
       default: take = 0;
     endcase
   end
@@ -128,10 +163,10 @@ module cpu (
             end
             OP_JALR: begin
               regs[rd] <= pc + 4;
-              pc       <= (a + imm_i) & 32'hfffffffe;   // jalr clears bit 0
+              pc       <= sum[25:0] & ~26'd1;   // jalr clears bit 0
             end
             OP_BRANCH: if (take) pc <= pc + imm_b;
-            OP_IMM, OP_REG: regs[rd] <= alu;
+            OP_IMM, OP_REG: regs[rd] <= is_mul ? a * b : alu;
           endcase
         end
 
