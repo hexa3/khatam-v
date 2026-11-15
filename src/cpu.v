@@ -19,15 +19,17 @@ module cpu (
   localparam EXEC  = 3'd3;
   localparam MEM   = 3'd4;
   localparam WB    = 3'd5;
+  localparam MUL   = 3'd6;
 
   reg [2:0]  state;
   reg [25:0] pc;                 // 64 MB of address space is plenty
   reg [31:0] ir;
   reg [31:0] a;                  // rs1
-  reg [31:0] rs2v;               // rs2
-  reg [31:0] lo;                 // result / memory address
+  reg [31:0] hi;                 // rs2, then the high half of a multiply
+  reg [31:0] lo;                 // result / memory address / low half of a multiply
   reg [31:0] yv;                 // second alu operand, already flipped if we're subtracting
   reg        sub;                // ...and whether we are
+  reg [4:0]  count;
   reg [31:0] regs [1:15];   // x0 is always 0 so it doesnt need a register
 
   wire [6:0] opcode = ir[6:0];
@@ -82,6 +84,8 @@ module cpu (
 
   wire [31:0] y = yv;   // for and/or/xor/shifts (never a subtract, so not inverted)
 
+  wire [31:0] b = hi;   // rs2
+
   // one write port, always from lo
   always @(posedge clk) begin
     if (state == WB && rd != 0) regs[rd] <= lo;
@@ -92,7 +96,7 @@ module cpu (
   assign mem_req   = (state == FETCH) || (state == MEM);
   assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
   assign mem_we    = (state == MEM) && is_store;
-  assign mem_wdata = rs2v;
+  assign mem_wdata = hi;
 
   reg [31:0] load_val;
   always @(*) begin
@@ -150,6 +154,10 @@ module cpu (
     endcase
   end
 
+  // multiply: hi += a if the low bit of lo is set, then shift {hi,lo} right
+  wire [32:0] hi_add;
+  adder mul_add (.x(hi), .y(lo[0] ? a : 32'd0), .cin(1'b0), .s(hi_add[31:0]), .cout(hi_add[32]));
+
   // what EXEC puts in lo
   reg [31:0] result;
   always @(*) begin
@@ -157,7 +165,7 @@ module cpu (
       OP_LUI:          result = imm_u;
       OP_AUIPC:        result = pc + imm_u;
       OP_JAL, OP_JALR: result = pc + 4;
-      default:         result = is_mul ? a * rs2v : alu;    // OP, OP-IMM
+      default:         result = alu;    // OP, OP-IMM
     endcase
   end
 
@@ -181,7 +189,7 @@ module cpu (
         end
 
         RS2: begin
-          rs2v  <= rval;
+          hi  <= rval;
           yv    <= do_sub ? ~y_next : y_next;
           sub   <= do_sub;
           state <= EXEC;
@@ -193,6 +201,11 @@ module cpu (
           if (opcode == OP_LOAD || opcode == OP_STORE) begin
             lo    <= sum;                 // the address (alu would pick by f3, which is the size here)
             state <= MEM;
+          end else if (is_mul) begin
+            hi    <= 0;
+            lo    <= b;                   // multiplier
+            count <= 0;
+            state <= MUL;
           end else begin
             if (opcode == OP_JAL)
               pc <= pc + imm_j;
@@ -218,8 +231,17 @@ module cpu (
 
         WB: begin
           // register write happens in the always block up top
-          if (opcode == OP_LOAD) pc <= pc + 4;   // the others moved pc in EXEC
+          if (opcode == OP_LOAD || is_mul) pc <= pc + 4;   // the others moved pc in EXEC
           state <= FETCH;
+        end
+
+        MUL: begin
+          // classic shift-add, one bit per clock
+          hi    <= hi_add[32:1];
+          lo    <= {hi_add[0], lo[31:1]};
+          count <= count + 1;
+          if (count == 31)
+            state <= WB;
         end
 
         default: state <= FETCH;
