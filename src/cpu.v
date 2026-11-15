@@ -60,10 +60,10 @@ module cpu (
   wire is_alu = is_reg || (opcode == OP_IMM);
   wire is_cmp = is_alu && (f3 == 3'b010 || f3 == 3'b011);   // SLT, SLTU
   wire do_sub = is_branch || is_cmp || (is_reg && f3 == 3'b000 && ir[30]);
-  wire [31:0] yv    = do_sub ? ~b : b;
-  wire [32:0] sum33 = {1'b0, a} + {1'b0, yv} + {32'd0, do_sub};
-  wire [31:0] sum   = sum33[31:0];
-  wire        carry = sum33[32];
+  wire [31:0] yv = do_sub ? ~b : b;
+  wire [31:0] sum;
+  wire        carry;
+  adder alu_add (.x(a), .y(yv), .cin(do_sub), .s(sum), .cout(carry));
 
   // compares only happen with do_sub, so the real operand is b
   wire eq  = (a == b);
