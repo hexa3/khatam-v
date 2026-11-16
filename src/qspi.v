@@ -31,11 +31,12 @@ module qspi (
     output reg         cs_ram     // active low
 );
 
-  localparam IDLE = 2'd0;
-  localparam CMD  = 2'd1;
-  localparam DATA = 2'd2;
+  localparam IDLE  = 3'd0;
+  localparam CLOSE = 3'd1;
+  localparam CMD   = 3'd2;
+  localparam DATA  = 3'd3;
 
-  reg [1:0]  state;
+  reg [2:0]  state;
   reg [31:0] tx;          // shifts out MSB first
   reg [31:0] rx;          // shifts in
   reg [5:0]  bits;        // bits left in this phase
@@ -77,6 +78,11 @@ module qspi (
               tx    <= 0;
               phase <= 0;
               state <= DATA;
+            end else if (cont) begin
+              // flash is still selected from last time, let go of it first
+              cs_flash <= 1;
+              cont     <= 0;
+              state    <= CLOSE;
             end else begin
               // start a new command
               if (ram) cs_ram   <= 0;
@@ -88,6 +94,11 @@ module qspi (
               state <= CMD;
             end
           end
+        end
+
+        CLOSE: begin
+          // one clock with CS high, then go back and start properly
+          state <= IDLE;
         end
 
         CMD, DATA: begin
@@ -126,6 +137,8 @@ module qspi (
             end
           end
         end
+
+        default: state <= IDLE;
       endcase
     end
   end
