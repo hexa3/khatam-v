@@ -1,15 +1,18 @@
 # build + flash for the Icepi Zero
+#   make              -> build with starfall and load it
+#   make GAME=mygame  -> some other game from ../games
 
-SOURCES = ../src/project.v ../src/cpu.v ../src/adder.v ../src/qspi.v ../src/gpu.v \
+GAME ?= starfall
+SOURCES = ../src/project.v ../src/cpu.v ../src/adder.v ../src/qspi.v ../src/gpu.v ../src/audio.v \
           top.v spi_bram.v pll.v dvi_out.v tmds_encoder.v
 
 all: prog
 
-firmware.hex: ../build/hello.hex
+firmware.hex: ../build/$(GAME).hex
 	cp $< $@
 
-../build/hello.hex:
-	$(MAKE) -C .. build/hello.hex
+../build/$(GAME).hex: FORCE
+	$(MAKE) -C .. GAME=$(GAME)
 
 khatam_v.json: $(SOURCES) firmware.hex
 	yosys -q -p 'synth_ecp5 -top top -json $@' $(SOURCES)
@@ -26,4 +29,5 @@ prog: khatam_v.bit
 clean:
 	rm -f khatam_v.json khatam_v.config khatam_v.bit firmware.hex
 
-.PHONY: all prog clean
+FORCE:
+.PHONY: all prog clean FORCE
