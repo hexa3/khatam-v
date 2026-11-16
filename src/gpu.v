@@ -1,24 +1,50 @@
+/*
+ * Graphics: 640x480 @ 60Hz VGA, no framebuffer
+ *
+ * Every pixel is worked out on the fly from (x, y), back to front:
+ *   1. background  - khatam star pattern (4 patterns, breathing, shimmer)
+ *   2. 4 shape sprites  - square / diamond / star / octagon, any size up to 63px
+ *   3. 2 bitmap sprites - 8x8 1-bit pictures, scaled 1x/2x/4x/8x
+ *
+ * Plus hardware collision detection, so games don't have to do the maths.
+ *
+ * Registers (byte offsets, all write only):
+ *   00 PATTERN  [1:0] pattern  [3:2] cell size  [4] auto breathe  [5] pattern on
+ *   04 RADIUS   [4:0] star radius when auto breathe is off (8..23 looks good)
+ *   08 SCROLLX  [9:0]
+ *   0C SCROLLY  [9:0]
+ *   10..20 PAL0..PAL4  background colours: bg, fill, fill2, line, accent (RRGGBB)
+ *   40 + 16*n  shape sprite n (0..3):  +0 X  +4 Y  +8 CTRL
+ *              CTRL [4:0] size  [6:5] shape  [7] enable  [13:8] colour
+ *   80 + 32*n  bitmap sprite n (0..1): +0 X  +4 Y  +8 CTRL  +C rows 0-3  +10 rows 4-7
+ *              CTRL [1:0] scale  [7] enable  [13:8] colour
+ *              each row is a byte, bit 7 = leftmost pixel, row 0 in bits [7:0]
+ *   C8 any write clears the collision flags
+ *
+ * Sprite X/Y is the centre for shapes and the top left corner for bitmaps.
+ */
+
 `default_nettype none
 
 module gpu (
-    input  wire       clk,
-    input  wire       rst_n,
+    input  wire        clk,
+    input  wire        rst_n,
 
     input  wire        wr,
     input  wire [7:0]  waddr,
     input  wire [31:0] wdata,
 
-    output reg  [5:0] rgb,
-    output reg        hsync,
-    output reg        vsync,
+    output reg  [5:0]  rgb,        // RRGGBB
+    output reg         hsync,
+    output reg         vsync,
 
     output reg  [15:0] frame,
     output wire [9:0]  line,
     output wire        vblank,
-    output reg  [11:0] collide    // [5:0] sprite hit a line, [11:6] sprite hit a sprite
+    output reg  [11:0] collide     // [5:0] sprite hit a line, [11:6] sprite hit a sprite
 );
 
-  // vga timing, moved here from project.v
+  // ================= VGA timing =================
   reg [9:0] hcount, vcount;
 
   always @(posedge clk) begin
@@ -43,7 +69,7 @@ module gpu (
   assign line   = vcount;
   assign vblank = (vcount >= 480);
 
-  // registers
+  // ================= registers =================
   reg [1:0]  pattern;
   reg [1:0]  cellsize;
   reg        breathe;
@@ -135,12 +161,12 @@ module gpu (
       endcase
     end
   end
-  // khatam star, one per 64x64 cell
-  // fold the cell so the middle is at 0,0 and every quarter looks the same
+
+  // ================= background: the khatam pattern =================
+  // (same maths as my first tile, see the docs)
   wire [9:0] x = hcount + scroll_x;
   wire [9:0] y = vcount + scroll_y;
 
-  // cell size: 64 (0), 32 (1) or 128 (2) pixels
   reg [5:0] px, py;
   reg [1:0] cx, cy;
   always @(*) begin
@@ -159,13 +185,22 @@ module gpu (
       end
     endcase
   end
+
   wire [4:0] ax = px[5] ? px[4:0] : ~px[4:0];
   wire [4:0] ay = py[5] ? py[4:0] : ~py[4:0];
   wire [5:0] sum_a = ax + ay;
+  wire [4:0] bx_ = ~ax;
+  wire [4:0] by_ = ~ay;
+  wire [5:0] sum_b = bx_ + by_;
 
-  // radius goes up and down, 16 .. 23 (frame counts up then down), or the radius register
   wire [6:0] tri_wave = frame[7] ? ~frame[6:0] : frame[6:0];
-  wire [4:0] r = breathe ? (5'd16 + tri_wave[6:4]) : radius;
+  wire [4:0] r   = breathe ? (5'd16 + tri_wave[6:4]) : radius;
+  wire [4:0] r3  = r - 5'd3;
+  wire [4:0] rs  = (r >> 2) + 5'd3;
+  wire [4:0] ro  = (r > 5'd23) ? 5'd31 : r + 5'd8;
+  wire [4:0] ro3 = ro - 5'd3;
+  wire [4:0] rb  = r - 5'd6;
+  wire [4:0] rb3 = rb - 5'd3;
 
   function [5:0] diag;  // 1.375 * rr
     input [4:0] rr;
@@ -174,7 +209,6 @@ module gpu (
     end
   endfunction
 
-  // 8 point star = a square OR a diamond (the square turned 45 degrees)
   function star;
     input [4:0] a, b;
     input [5:0] s;
@@ -184,7 +218,6 @@ module gpu (
     end
   endfunction
 
-  // octagon = the square AND the diamond, so the corners are cut off
   function octagon;
     input [4:0] a, b;
     input [5:0] s;
@@ -194,33 +227,18 @@ module gpu (
     end
   endfunction
 
-  wire [4:0] r3  = r - 5'd3;
-  wire [4:0] rs  = (r >> 2) + 5'd3;
-  wire [4:0] ro  = (r > 5'd23) ? 5'd31 : r + 5'd8;
-  wire [4:0] ro3 = ro - 5'd3;
-
-  // second star, flipped inside out and shifted by half a cell
-  wire [4:0] bx_ = ~ax;
-  wire [4:0] by_ = ~ay;
-  wire [5:0] sum_b = bx_ + by_;
-  wire [4:0] rb  = r - 5'd6;
-  wire [4:0] rb3 = rb - 5'd3;
-
-  wire in_star     = star(ax, ay, sum_a, r);
-  wire line_star   = in_star & ~star(ax, ay, sum_a, r3);
-  wire rosette     = octagon(ax, ay, sum_a, rs);
-  wire in_oct      = octagon(ax, ay, sum_a, ro);
-  wire line_oct    = in_oct & ~octagon(ax, ay, sum_a, ro3);
-  wire small_star  = star(ax, ay, sum_a, rs);
-  wire [5:0] dd = r + 5'd9;
-  wire in_dia   = (sum_a <= dd);
-  wire line_dia = in_dia && (sum_a > dd - 6'd3);
-
-  wire [5:0] ripple = sum_a + frame[6:3];   // makes the diamonds shimmer
-
-  wire in_starb    = star(bx_, by_, sum_b, rb);
-  wire line_starb  = in_starb & ~star(bx_, by_, sum_b, rb3);
-
+  wire in_star    = star(ax, ay, sum_a, r);
+  wire line_star  = in_star & ~star(ax, ay, sum_a, r3);
+  wire rosette    = octagon(ax, ay, sum_a, rs);
+  wire in_starb   = star(bx_, by_, sum_b, rb);
+  wire line_starb = in_starb & ~star(bx_, by_, sum_b, rb3);
+  wire in_oct     = octagon(ax, ay, sum_a, ro);
+  wire line_oct   = in_oct & ~octagon(ax, ay, sum_a, ro3);
+  wire small_star = star(ax, ay, sum_a, rs);
+  wire [5:0] dd   = r + 5'd9;
+  wire in_dia     = (sum_a <= dd);
+  wire line_dia   = in_dia && (sum_a > dd - 6'd3);
+  wire [5:0] ripple = sum_a + frame[6:3];
 
   localparam BG = 3'd0, FILL = 3'd1, FILL2 = 3'd2, LINE = 3'd3, ACCENT = 3'd4;
 
@@ -242,7 +260,6 @@ module gpu (
         else                 kind = BG;
       end
       2'd2: begin
-        // the two stars cross over each other
         if (line_star && line_starb)  kind = (px[5] ^ py[5]) ? LINE : ACCENT;
         else if (line_star)           kind = LINE;
         else if (line_starb)          kind = ACCENT;
@@ -260,7 +277,6 @@ module gpu (
     endcase
   end
 
-  // bands of 2 colours that slide across the cells
   wire [1:0] cx2  = on_b ? cx + px[5] : cx;
   wire [1:0] cy2  = on_b ? cy + py[5] : cy;
   wire [1:0] band = cx2 + cy2 - frame[6:5];
@@ -280,7 +296,6 @@ module gpu (
   wire bg_line = pattern_on && (kind == LINE);
 
   // ================= shape sprites =================
-  // shape: 0 square, 1 diamond, 2 star, 3 octagon. x/y is the middle
   reg [3:0] shape_hit;
   integer i;
   always @(*) begin
@@ -316,8 +331,7 @@ module gpu (
     end
   endfunction
 
-  // ================= bitmap sprite =================
-  // 8x8 picture, 1 bit per pixel, scaled up 1x/2x/4x/8x. x/y is the top left
+  // ================= bitmap sprites =================
   function bitmap_px;
     input [9:0]  h, v, x0, y0;
     input [1:0]  scale;
@@ -339,6 +353,7 @@ module gpu (
   wire bm0 = bon[0] && bitmap_px(hcount, vcount, bx[0], by[0], bscale[0], bbits[0]);
   wire bm1 = bon[1] && bitmap_px(hcount, vcount, bx[1], by[1], bscale[1], bbits[1]);
 
+  // ================= put it together =================
   reg [5:0] color;
   always @(*) begin
     if (bm0)               color = bcol[0];
@@ -350,8 +365,8 @@ module gpu (
     else                   color = bg_color;
   end
 
-  // which sprites are on this pixel, and is there more than one
-  wire [5:0] here  = {bm1, bm0, shape_hit};
+  // collisions: which sprites are on this pixel, and is there more than one
+  wire [5:0] here = {bm1, bm0, shape_hit};
   wire       crowd = (here & (here - 6'd1)) != 0;
 
   always @(posedge clk) begin

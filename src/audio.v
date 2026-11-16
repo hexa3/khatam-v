@@ -1,4 +1,16 @@
-// sound: 2 square wave voices + a noise voice, a volume for each
+/*
+ * Sound: 2 square wave voices + 1 noise voice, mixed into a PWM pin
+ * (that's uio[7], same pin as the Tiny Tapeout audio pmod)
+ *
+ * Registers (byte offset):
+ *   00 VOICE0  [11:0] period    note freq = 25 MHz / 128 / period
+ *   04 VOICE1  [11:0] period    (0 = off)
+ *   08 NOISE   [11:0] period    how fast the noise changes
+ *   0C VOLUME  [3:0] voice0  [7:4] voice1  [11:8] noise
+ *
+ * e.g. A4 (440 Hz) -> period = 25000000 / 128 / 440 = 444
+ */
+
 `default_nettype none
 
 module audio (
@@ -26,13 +38,10 @@ module audio (
       period1 <= 0;
       period2 <= 0;
       volume  <= 0;
-      cnt0    <= 0;
-      cnt1    <= 0;
-      cnt2    <= 0;
-      sq0     <= 0;
-      sq1     <= 0;
-      lfsr    <= 15'h1;
-      pre     <= 0;
+      cnt0 <= 0; cnt1 <= 0; cnt2 <= 0;
+      sq0  <= 0; sq1  <= 0;
+      lfsr <= 15'h1;
+      pre  <= 0;
     end else begin
       pre <= pre + 1;
 

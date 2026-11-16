@@ -1,12 +1,20 @@
 /*
- * spi controller for the tiny tapeout qspi pmod
- *   flash (W25Q128) on cs_flash : code + constants
- *   psram (APS6404) on cs_ram   : ram
+ * SPI memory controller for the Tiny Tapeout QSPI Pmod
+ *   - flash (W25Q128) on CS0 : code + constants, read only
+ *   - PSRAM (APS6404) on CS1 : RAM
  *
- * only 1 bit spi for now (mode 0, sck = clk / 2). both chips understand
- *   0x03 <24 bit addr> <data...>   read
- *   0x02 <24 bit addr> <data...>   write
- * so it's the same state machine for both
+ * Plain 1-bit SPI, mode 0, SCK = clk/2. Both chips understand
+ *   0x03 <24 bit addr> <data out...>   read
+ *   0x02 <24 bit addr> <data in...>    write
+ * so one state machine does both.
+ *
+ * Speed trick: after a flash read we leave CS low. If the next request is
+ * a flash read of the very next address (which is what instruction fetch
+ * does 90% of the time) we skip the command + address and just keep
+ * clocking. That halves the fetch time.
+ *
+ * Bytes go out/in starting at addr, lowest byte first. rdata[7:0] is
+ * the byte at addr, so this is little endian like RISC-V wants.
  */
 
 `default_nettype none
@@ -68,6 +76,7 @@ module qspi (
       done <= 0;
 
       case (state)
+
         IDLE: begin
           if (req && !done) begin
             writing <= we;

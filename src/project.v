@@ -1,3 +1,34 @@
+/*
+ * Khatam-V : a RISC-V game console on one Tiny Tapeout chip
+ *
+ *   cpu.v    RV32E + multiply, runs C code
+ *   qspi.v   code from SPI flash, RAM in SPI PSRAM (QSPI Pmod)
+ *   gpu.v    VGA graphics: khatam star patterns + sprites + collisions
+ *   audio.v  2 square voices + noise
+ *
+ * Memory map
+ *   0x0000000  flash   (16 MB, read only, program starts at 0)
+ *   0x1000000  PSRAM   (8 MB)
+ *   0x2000000  I/O
+ *      000-0FF  gpu registers           (write)
+ *      0C0      FRAME   frame counter   (read)
+ *      0C4      LINE    [9:0] current line, [16] vblank (read)
+ *      0C8      COLLIDE collision flags (read, write anything to clear)
+ *      0D0      BUTTONS ui_in           (read)
+ *      0E0-0EF  audio registers         (write)
+ *
+ * Pins
+ *   ui_in      8 buttons
+ *   uo_out     TinyVGA pmod
+ *   uio[0]     flash CS        uio[4]  IO2 (held high)
+ *   uio[1]     MOSI            uio[5]  IO3 (held high)
+ *   uio[2]     MISO            uio[6]  PSRAM CS
+ *   uio[3]     SCK             uio[7]  audio out (PWM)
+ *
+ * While rst_n is low every uio pin is an input, so something else (like the
+ * RP2040 on the demo board) can program the flash.
+ */
+
 `default_nettype none
 
 module tt_um_khatam_v (
@@ -11,7 +42,7 @@ module tt_um_khatam_v (
     input  wire       rst_n
 );
 
-  // cpu
+  // ---------------- CPU ----------------
   wire [25:0] mem_addr;
   wire [31:0] mem_wdata;
   wire [2:0]  mem_size;
@@ -35,7 +66,7 @@ module tt_um_khatam_v (
   wire is_io  = mem_addr[25];
   wire is_ram = mem_addr[24];
 
-  // flash + psram
+  // ---------------- flash + PSRAM ----------------
   wire [31:0] spi_rdata;
   wire        spi_done;
   wire        sck, mosi, cs_flash, cs_ram;
@@ -58,12 +89,20 @@ module tt_um_khatam_v (
       .cs_ram  (cs_ram)
   );
 
-  // io
-  wire        io_req  = mem_req && is_io;
-  reg         io_done;
-  wire        io_wr   = io_req && mem_we && !io_done;
+  // ---------------- I/O ----------------
+  wire io_req = mem_req && is_io;
+  reg  io_done;
   reg  [31:0] io_rdata;
   reg  [7:0]  buttons;
+  wire io_wr = io_req && mem_we && !io_done;
+
+  wire [15:0] frame;
+  wire [9:0]  line;
+  wire        vblank;
+  wire [11:0] collide;
+  wire [5:0]  rgb;
+  wire        hsync, vsync;
+  wire        audio_out;
 
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -73,14 +112,6 @@ module tt_um_khatam_v (
       io_done <= io_req && !io_done;
     end
   end
-
-  wire [15:0] frame;
-  wire [9:0]  line;
-  wire        vblank;
-  wire [11:0] collide;
-  wire [5:0]  rgb;
-  wire        hsync, vsync;
-  wire        audio_out;
 
   always @(*) begin
     case (mem_addr[7:0])
@@ -92,21 +123,18 @@ module tt_um_khatam_v (
     endcase
   end
 
-  assign mem_rdata = is_io ? io_rdata : spi_rdata;
-  assign mem_done  = is_io ? io_done  : spi_done;
-
   gpu gpu0 (
-      .clk  (clk),
-      .rst_n(rst_n),
-      .wr   (io_wr && mem_addr[7:5] != 3'b111),   // everything below 0xE0
-      .waddr(mem_addr[7:0]),
-      .wdata(mem_wdata),
-      .rgb  (rgb),
-      .hsync(hsync),
-      .vsync(vsync),
-      .frame(frame),
-      .line (line),
-      .vblank(vblank),
+      .clk    (clk),
+      .rst_n  (rst_n),
+      .wr     (io_wr && mem_addr[7:5] != 3'b111),   // everything below 0xE0
+      .waddr  (mem_addr[7:0]),
+      .wdata  (mem_wdata),
+      .rgb    (rgb),
+      .hsync  (hsync),
+      .vsync  (vsync),
+      .frame  (frame),
+      .line   (line),
+      .vblank (vblank),
       .collide(collide)
   );
 
@@ -119,10 +147,13 @@ module tt_um_khatam_v (
       .pwm  (audio_out)
   );
 
-  // tinyvga pmod: R1 G1 B1 vs R0 G0 B0 hs
+  assign mem_rdata = is_io ? io_rdata : spi_rdata;
+  assign mem_done  = is_io ? io_done  : spi_done;
+
+  // ---------------- pins ----------------
+  // TinyVGA pmod: rgb = {R1, R0, G1, G0, B1, B0}
   assign uo_out = {hsync, rgb[0], rgb[2], rgb[4], vsync, rgb[1], rgb[3], rgb[5]};
 
-  // uio: 0 flash cs, 1 mosi, 2 miso (input), 3 sck, 4+5 io2/io3 (held high), 6 psram cs, 7 audio
   assign uio_out = {audio_out, cs_ram, 1'b1, 1'b1, sck, 1'b0, mosi, cs_flash};
   assign uio_oe  = rst_n ? 8'b1111_1011 : 8'b0000_0000;
 
