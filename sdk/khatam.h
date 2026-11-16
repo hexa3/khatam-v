@@ -16,15 +16,9 @@ typedef unsigned char  u8;
 #define GPU_SCROLLY    IO(0x0C)
 #define GPU_PAL(n)     IO(0x10 + 4 * (n))
 
-#define SND_VOICE0     IO(0xE0)
-#define SND_VOICE1     IO(0xE4)
-#define SND_NOISE      IO(0xE8)
-#define SND_VOLUME     IO(0xEC)
-
-#define FRAME          IO(0xC0)
-#define LINE           IO(0xC4)
-#define COLLIDE        IO(0xC8)
-#define BUTTONS        IO(0xD0)
+#define SHAPE_X(n)     IO(0x40 + 16 * (n))
+#define SHAPE_Y(n)     IO(0x44 + 16 * (n))
+#define SHAPE_CTRL(n)  IO(0x48 + 16 * (n))
 
 #define BITMAP_X(n)    IO(0x80 + 32 * (n))
 #define BITMAP_Y(n)    IO(0x84 + 32 * (n))
@@ -32,9 +26,16 @@ typedef unsigned char  u8;
 #define BITMAP_LO(n)   IO(0x8C + 32 * (n))
 #define BITMAP_HI(n)   IO(0x90 + 32 * (n))
 
-#define SHAPE_X(n)     IO(0x40 + 16 * (n))
-#define SHAPE_Y(n)     IO(0x44 + 16 * (n))
-#define SHAPE_CTRL(n)  IO(0x48 + 16 * (n))
+#define FRAME          IO(0xC0)
+#define LINE           IO(0xC4)
+#define COLLIDE        IO(0xC8)
+#define BUTTONS        IO(0xD0)
+
+// ---------------- sound ----------------
+#define SND_VOICE0     IO(0xE0)
+#define SND_VOICE1     IO(0xE4)
+#define SND_NOISE      IO(0xE8)
+#define SND_VOLUME     IO(0xEC)
 
 // patterns
 #define STAR_CROSS  0
@@ -48,14 +49,6 @@ typedef unsigned char  u8;
 #define STAR        2
 #define OCTAGON     3
 
-// collision bits
-#define HIT_LINE(n)   (1u << (n))        // sprite n touched a pattern line
-#define HIT_SPRITE(n) (1u << (6 + (n)))  // sprite n touched another sprite
-// sprite numbers for those: shapes are 0-3, bitmaps are 4 and 5
-
-// note period for the sound registers (freq in Hz)
-#define NOTE(hz) (25000000 / 128 / (hz))
-
 // palette slots
 #define PAL_BG      0
 #define PAL_FILL    1
@@ -63,8 +56,16 @@ typedef unsigned char  u8;
 #define PAL_LINE    3
 #define PAL_ACCENT  4
 
+// collision bits
+#define HIT_LINE(n)   (1u << (n))        // sprite n touched a pattern line
+#define HIT_SPRITE(n) (1u << (6 + (n)))  // sprite n touched another sprite
+// sprite numbers for those: shapes are 0-3, bitmaps are 4 and 5
+
 // colour from 0-3 per channel
 #define RGB(r, g, b) (((r) << 4) | ((g) << 2) | (b))
+
+// note period for the sound registers (freq in Hz)
+#define NOTE(hz) (25000000 / 128 / (hz))
 
 static inline void background(int pattern, int cell, int breathe)
 {
@@ -109,16 +110,16 @@ static inline void bitmap_off(int n)
     BITMAP_CTRL(n) = 0;
 }
 
-static inline u32 buttons(void)
-{
-    return BUTTONS;
-}
-
 static inline void wait_vblank(void)
 {
     u32 f = FRAME;
     while (FRAME == f)
         ;
+}
+
+static inline u32 buttons(void)
+{
+    return BUTTONS;
 }
 
 void sound_off(void);

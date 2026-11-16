@@ -1,6 +1,9 @@
-// Starfall - catch the falling stars
+// Starfall - catch the falling stars, dodge the red octagons
 //
 // buttons: ui_in[0] = left, ui_in[1] = right, ui_in[2] = start
+//
+// every 10 stars you go up a level: new pattern, new colours, faster stars.
+// 3 lives. the digit in the corner is your level.
 
 #include "khatam.h"
 
@@ -88,29 +91,6 @@ static void draw_faller(int i)
         shape(i, fall[i].x, fall[i].y, 16, STAR, star_colours[level & 3]);
 }
 
-static void sounds(u32 frame)
-{
-    int vol0 = 0, noise = 0;
-
-    if (beep) {
-        SND_VOICE0 = NOTE(880 + 40 * beep);
-        vol0 = beep;
-        beep--;
-    }
-    if (crash) {
-        SND_NOISE = 8;
-        noise = crash;
-        crash--;
-    }
-
-    SND_VOICE1 = bass[(frame >> 4) & 7];
-    int bassvol = 6 - ((frame >> 1) & 7);   // little "pluck" on each note
-    if (bassvol < 0)
-        bassvol = 0;
-
-    SND_VOLUME = vol0 | (bassvol << 4) | (noise << 8);
-}
-
 static void new_game(void)
 {
     player_x = 304;
@@ -137,6 +117,29 @@ static void game_over(void)
         wait_vblank();
 }
 
+static void sounds(u32 frame)
+{
+    int vol0 = 0, noise = 0;
+
+    if (beep) {
+        SND_VOICE0 = NOTE(880 + 40 * beep);
+        vol0 = beep;
+        beep--;
+    }
+    if (crash) {
+        SND_NOISE = 8;
+        noise = crash;
+        crash--;
+    }
+
+    SND_VOICE1 = bass[(frame >> 4) & 7];
+    int bassvol = 6 - ((frame >> 1) & 7);   // little "pluck" on each note
+    if (bassvol < 0)
+        bassvol = 0;
+
+    SND_VOLUME = vol0 | (bassvol << 4) | (noise << 8);
+}
+
 int main(void)
 {
     new_game();
@@ -145,13 +148,12 @@ int main(void)
         wait_vblank();
         u32 frame = FRAME;
 
-        // collisions from last frame
+        // ---- collisions from last frame ----
         u32 hits = COLLIDE;
         COLLIDE = 0;
 
         if (hits & HIT_SPRITE(4)) {
             for (int i = 0; i < NUM_FALL; i++) {
-                // stars that touch each other count as a hit too, so only look near the bottom
                 if (!(hits & HIT_SPRITE(i)) || fall[i].y < PLAYER_Y - 40)
                     continue;
                 if (fall[i].kind) {
@@ -173,6 +175,7 @@ int main(void)
             continue;
         }
 
+        // ---- move the player ----
         u32 b = buttons();
         if ((b & LEFT) && player_x > 4)
             player_x -= 6;
@@ -180,6 +183,7 @@ int main(void)
             player_x += 6;
         bitmap_move(0, player_x, PLAYER_Y);
 
+        // ---- move the stars ----
         for (int i = 0; i < NUM_FALL; i++) {
             fall[i].y += fall[i].speed;
             if (fall[i].y > 480 + 16)
