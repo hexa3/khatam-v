@@ -178,7 +178,7 @@ int main(void)
             player_x -= 6;
         if ((b & RIGHT) && player_x < 640 - 36)
             player_x += 6;
-        bitmap_move(0, player_x, 420);
+        bitmap_move(0, player_x, PLAYER_Y);
 
         for (int i = 0; i < NUM_FALL; i++) {
             fall[i].y += fall[i].speed;
@@ -189,6 +189,9 @@ int main(void)
             else
                 shape_off(i);
         }
+
+        // slowly drift the background
+        GPU_SCROLLX = frame >> 1;
 
         sounds(frame);
     }
