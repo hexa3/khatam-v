@@ -1,4 +1,17 @@
 // Icepi Zero test build for Khatam-V
+//
+// The chip (tt_um_khatam_v) is exactly the same Verilog that goes on the
+// tapeout. Out here we fake everything around it:
+//   - PLL: 50 MHz -> 25 MHz pixel clock + 125 MHz for HDMI
+//   - the QSPI Pmod: two block RAM "SPI chips" (spi_bram.v), the flash one
+//     loaded with the game at build time
+//   - VGA -> HDMI on the mini HDMI port
+//
+//   button[0]  = left,  button[1] = right,  both at once = start
+//   sw[4:0]    = the other 5 game buttons on header pins (ui_in[7:3])
+//   audio      = PWM sound on header pin 12, put a speaker/piezo on it
+//                (with a resistor) or an RC filter into an amp
+//   led        = some activity lights
 `default_nettype none
 
 module top (

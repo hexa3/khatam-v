@@ -1,5 +1,5 @@
-// TMDS encoder, from the DVI spec (section 3.3 flowchart)
-// 8 bit pixel -> 10 bit symbol
+// TMDS encoder, straight from the DVI 1.0 spec (section 3.3, the flowchart)
+// 8 bit pixel -> 10 bit symbol, DC balanced
 `default_nettype none
 
 module tmds_encoder (
@@ -10,7 +10,7 @@ module tmds_encoder (
     output reg  [9:0] q
 );
 
-  // step 1: xor or xnor chain, whichever gives fewer transitions
+  // ---- step 1: xor or xnor chain, whichever gives fewer transitions ----
   wire [3:0] ones_d = d[0] + d[1] + d[2] + d[3] + d[4] + d[5] + d[6] + d[7];
   wire use_xnor = (ones_d > 4) || (ones_d == 4 && d[0] == 0);
 
@@ -25,7 +25,7 @@ module tmds_encoder (
   assign qm[7] = use_xnor ? ~(qm[6] ^ d[7]) : (qm[6] ^ d[7]);
   assign qm[8] = ~use_xnor;
 
-  // step 2: keep the line DC balanced
+  // ---- step 2: keep the line DC balanced ----
   wire [3:0] ones_qm  = qm[0] + qm[1] + qm[2] + qm[3] + qm[4] + qm[5] + qm[6] + qm[7];
   wire [3:0] zeros_qm = 4'd8 - ones_qm;
 

@@ -1,4 +1,4 @@
-/* flash at 0, ram at 0x1000000 */
+/* code + constants live in flash at 0, variables + stack in PSRAM */
 
 MEMORY
 {

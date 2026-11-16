@@ -1,9 +1,11 @@
-// Pretend SPI memory chip made out of FPGA block RAM so the Icepi Zero can
-// stand in for the QSPI Pmod. Understands 0x03 read and 0x02 write.
-// 32 KB, the address just wraps after that.
+// Pretend SPI memory chip made out of FPGA block RAM, so the Icepi Zero can
+// stand in for the QSPI Pmod. Understands the same two commands the chip
+// uses: 0x03 read and 0x02 write. 32 KB, the address just wraps after that
+// (so the stack at the top of "8 MB" lands at the top of the 32 KB).
 //
 // Runs on the same 25 MHz clock as the chip. The chip only changes SCK on a
-// clock edge, so we can just watch for it going up.
+// clock edge, so we can just watch for it going up and down - no
+// synchronisers needed.
 `default_nettype none
 
 module spi_bram #(
@@ -29,13 +31,14 @@ module spi_bram #(
   reg [7:0]  rbyte = 0;
 
   wire rise = sck && !sck_prev;
+  wire [23:0] next_addr = {addr[22:0], mosi};
 
   // the byte we're on right now
   wire [14:0] byte_addr = addr[14:0] + dbits[17:3];
 
   always @(posedge clk) begin
     sck_prev <= sck;
-    rbyte    <= mem[byte_addr];
+    rbyte    <= mem[byte_addr];      // block RAM read, 1 clock late (that's fine, see below)
 
     if (cs_n) begin
       cnt   <= 0;
@@ -45,7 +48,7 @@ module spi_bram #(
         cmd <= {cmd[6:0], mosi};
         cnt <= cnt + 1;
       end else if (cnt < 32) begin
-        addr <= {addr[22:0], mosi};
+        addr <= next_addr;
         cnt  <= cnt + 1;
       end else begin
         dbits <= dbits + 1;
@@ -58,6 +61,8 @@ module spi_bram #(
     end
   end
 
+  // the chip samples MISO one clock before it drops SCK, which is 2 clocks
+  // after we saw the rising edge, so the block RAM has caught up by then
   assign miso = rbyte[7 - dbits[2:0]];
 
 endmodule
