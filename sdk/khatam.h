@@ -93,8 +93,8 @@ static inline void bitmap(int n, int x, int y, int scale, int colour, const u8 *
 {
     BITMAP_X(n) = x;
     BITMAP_Y(n) = y;
-    BITMAP_LO(n) = rows[0] | (rows[1] << 8) | (rows[2] << 16) | (rows[3] << 24);
-    BITMAP_HI(n) = rows[4] | (rows[5] << 8) | (rows[6] << 16) | (rows[7] << 24);
+    BITMAP_LO(n) = rows[0] | (rows[1] << 8) | (rows[2] << 16) | ((u32)rows[3] << 24);
+    BITMAP_HI(n) = rows[4] | (rows[5] << 8) | (rows[6] << 16) | ((u32)rows[7] << 24);
     BITMAP_CTRL(n) = scale | (1 << 7) | (colour << 8);
 }
 
