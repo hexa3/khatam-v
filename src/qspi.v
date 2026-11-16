@@ -36,11 +36,14 @@ module qspi (
   localparam DATA = 2'd2;
 
   reg [1:0]  state;
-  reg [31:0] tx;
-  reg [31:0] rx;
-  reg [5:0]  bits;
-  reg        phase;     // 0 = about to raise sck, 1 = about to drop it
+  reg [31:0] tx;          // shifts out MSB first
+  reg [31:0] rx;          // shifts in
+  reg [5:0]  bits;        // bits left in this phase
+  reg        phase;       // 0 = about to raise sck, 1 = about to drop it
+  reg        writing;
   reg [2:0]  nbytes;
+  reg        cont;        // flash CS still low and we know the next address
+  reg [23:0] cont_addr;
 
   // byte swap helpers. first byte on the wire = lowest byte
   wire [31:0] wswap = {wdata[7:0], wdata[15:8], wdata[23:16], wdata[31:24]};
@@ -58,6 +61,7 @@ module qspi (
       cs_flash <= 1;
       cs_ram   <= 1;
       done     <= 0;
+      cont     <= 0;
       phase    <= 0;
     end else begin
       done <= 0;
@@ -65,14 +69,24 @@ module qspi (
       case (state)
         IDLE: begin
           if (req && !done) begin
-            nbytes <= size;
-            if (ram) cs_ram   <= 0;
-            else     cs_flash <= 0;
-            tx    <= {(we ? 8'h02 : 8'h03), addr};   // 0x03 = read, 0x02 = write
-            mosi  <= 0;
-            bits  <= 6'd32;
-            phase <= 0;
-            state <= CMD;
+            writing <= we;
+            nbytes  <= size;
+            if (!ram && !we && cont && addr == cont_addr) begin
+              // keep reading where we left off, no command needed
+              bits  <= {size, 3'b000};
+              tx    <= 0;
+              phase <= 0;
+              state <= DATA;
+            end else begin
+              // start a new command
+              if (ram) cs_ram   <= 0;
+              else     cs_flash <= 0;
+              tx    <= {(we ? 8'h02 : 8'h03), addr};
+              mosi  <= 0;               // first bit of 0x02/0x03 is 0
+              bits  <= 6'd32;
+              phase <= 0;
+              state <= CMD;
+            end
           end
         end
 
@@ -90,15 +104,24 @@ module qspi (
 
             if (bits == 1) begin
               if (state == CMD) begin
+                // address sent, now the data
                 state <= DATA;
                 bits  <= {nbytes, 3'b000};
                 tx    <= wswap;
                 mosi  <= wswap[31];
               end else begin
-                done     <= 1;
-                state    <= IDLE;
-                cs_flash <= 1;
-                cs_ram   <= 1;
+                // all done
+                done  <= 1;
+                state <= IDLE;
+
+                if (!ram && !writing) begin
+                  // leave flash selected for the next sequential read
+                  cont      <= 1;
+                  cont_addr <= addr + {21'd0, nbytes};
+                end else begin
+                  cs_flash <= 1;
+                  cs_ram   <= 1;
+                end
               end
             end
           end
