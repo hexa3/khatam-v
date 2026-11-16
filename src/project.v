@@ -124,7 +124,7 @@ module tt_um_khatam_v (
 
   // uio: 0 flash cs, 1 mosi, 2 miso (input), 3 sck, 4+5 io2/io3 (held high), 6 psram cs, 7 audio
   assign uio_out = {audio_out, cs_ram, 1'b1, 1'b1, sck, 1'b0, mosi, cs_flash};
-  assign uio_oe  = 8'b1111_1011;
+  assign uio_oe  = rst_n ? 8'b1111_1011 : 8'b0000_0000;
 
   wire _unused = &{ena, uio_in[7:3], uio_in[1:0], 1'b0};
 
