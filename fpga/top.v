@@ -4,6 +4,7 @@
 module top (
     input  wire       clk,       // 50 MHz
     input  wire [1:0] button,    // active low
+    input  wire [4:0] sw,
     output wire       audio,
     output wire [3:0] gpdi_dp
 );
@@ -27,6 +28,8 @@ module top (
     btn_s1 <= ~button;
     btn_s2 <= btn_s1;
   end
+  wire both = btn_s2[0] & btn_s2[1];
+  wire [7:0] ui_in = {sw, both, btn_s2[1] & ~both, btn_s2[0] & ~both};
 
   // ---------------- the chip ----------------
   wire [7:0] uo_out, uio_out, uio_oe;
@@ -34,7 +37,7 @@ module top (
   wire       miso = !uio_out[0] ? miso_flash : miso_ram;
 
   tt_um_khatam_v chip (
-      .ui_in  ({6'd0, btn_s2}),
+      .ui_in  (ui_in),
       .uo_out (uo_out),
       .uio_in ({5'd0, miso, 2'd0}),
       .uio_out(uio_out),
