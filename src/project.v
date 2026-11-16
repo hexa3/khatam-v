@@ -58,14 +58,21 @@ module tt_um_khatam_v (
       .cs_ram  (cs_ram)
   );
 
-  // io. everything here answers in the same clock
+  // io
   wire        io_req  = mem_req && is_io;
-  wire        io_done = io_req;
-  wire        io_wr   = io_req && mem_we;
+  reg         io_done;
+  wire        io_wr   = io_req && mem_we && !io_done;
   reg  [31:0] io_rdata;
   reg  [7:0]  buttons;
 
-  always @(posedge clk) buttons <= ui_in;
+  always @(posedge clk) begin
+    if (!rst_n) begin
+      io_done <= 0;
+    end else begin
+      buttons <= ui_in;
+      io_done <= io_req && !io_done;
+    end
+  end
 
   wire [15:0] frame;
   wire [9:0]  line;
