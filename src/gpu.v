@@ -66,6 +66,8 @@ module gpu (
   reg [5:0]  bcol [0:1];
   reg [63:0] bbits [0:1];
 
+  wire clear_collide = wr && (waddr == 8'hC8);
+
   always @(posedge clk) begin
     if (!rst_n) begin
       pattern    <= 0;
@@ -91,7 +93,7 @@ module gpu (
           breathe    <= wdata[4];
           pattern_on <= wdata[5];
         end
-        8'h04: radius <= wdata[4:0];
+        8'h04: radius   <= wdata[4:0];
         8'h08: scroll_x <= wdata[9:0];
         8'h0C: scroll_y <= wdata[9:0];
         8'h10: pal0 <= wdata[5:0];
@@ -275,6 +277,8 @@ module gpu (
     endcase
   end
 
+  wire bg_line = pattern_on && (kind == LINE);
+
   // ================= shape sprites =================
   // shape: 0 square, 1 diamond, 2 star, 3 octagon. x/y is the middle
   reg [3:0] shape_hit;
@@ -346,14 +350,9 @@ module gpu (
     else                   color = bg_color;
   end
 
-  // did a sprite touch one of the lines of the pattern
-  wire bg_line = pattern_on && (kind == LINE);
-
   // which sprites are on this pixel, and is there more than one
   wire [5:0] here  = {bm1, bm0, shape_hit};
   wire       crowd = (here & (here - 6'd1)) != 0;
-
-  wire clear_collide = wr && (waddr == 8'hC8);
 
   always @(posedge clk) begin
     if (!rst_n || clear_collide) begin
