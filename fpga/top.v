@@ -6,6 +6,7 @@ module top (
     input  wire [1:0] button,    // active low
     input  wire [4:0] sw,
     output wire       audio,
+    output wire [4:0] led,
     output wire [3:0] gpdi_dp
 );
 
@@ -96,5 +97,8 @@ module top (
       .de       (de),
       .gpdi_dp  (gpdi_dp)
   );
+
+  // lights: pll locked, flash busy, ram busy, sound, vsync
+  assign led = {vsync, uio_out[7], ~uio_out[6], ~uio_out[0], locked};
 
 endmodule

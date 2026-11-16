@@ -1,6 +1,7 @@
 # build + flash for the Icepi Zero
 #   make              -> build with starfall and load it
 #   make GAME=mygame  -> some other game from ../games
+#   make flash        -> write it to flash so it stays after power off
 
 GAME ?= starfall
 SOURCES = ../src/project.v ../src/cpu.v ../src/adder.v ../src/qspi.v ../src/gpu.v ../src/audio.v \
@@ -23,11 +24,16 @@ khatam_v.config: khatam_v.json icepi-zero.lpf
 khatam_v.bit: khatam_v.config
 	ecppack --compress $< $@
 
+build: khatam_v.bit
+
 prog: khatam_v.bit
 	openFPGALoader -b icepi-zero $<
+
+flash: khatam_v.bit
+	openFPGALoader -b icepi-zero --write-flash $<
 
 clean:
 	rm -f khatam_v.json khatam_v.config khatam_v.bit firmware.hex
 
 FORCE:
-.PHONY: all prog clean FORCE
+.PHONY: all build prog flash clean FORCE
