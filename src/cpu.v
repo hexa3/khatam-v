@@ -1,9 +1,36 @@
-// risc-v cpu, first try. rv32e: only 16 registers, the chip is tiny
+/*
+ * RV32E + Zmmul CPU
+ *
+ * Multi-cycle, nothing fancy. Fetch takes ages anyway because the code lives
+ * in SPI flash (~70 clocks), so there's no point pipelining anything. Instead
+ * it's built to be small and to make timing on GF180, which is slow:
+ *
+ *   - one register file read port, one shifter, shared adders
+ *   - rs1 gets latched into a, rs2 into hi, before EXEC
+ *   - every result goes into lo first, and WB writes lo into the register
+ *     file the clock after. so the register file only ever gets written from
+ *     one flip flop and there's never a giant path into it
+ *   - hi/lo are the multiplier registers the rest of the time
+ *
+ *   FETCH -> RS1 -> RS2 -> EXEC -> WB -> FETCH
+ *                           EXEC -> MEM -> (WB) -> FETCH
+ *                           EXEC -> MUL x32 -> (FIX0 -> FIX1 -> FIX2) -> WB
+ *
+ * - 15 registers (x1..x15), x0 is always 0          (that's the "E" in RV32E)
+ * - MUL/MULH/MULHSU/MULHU with a 32 step shift-add  (that's Zmmul)
+ * - FENCE / ECALL / EBREAK / CSR stuff = NOP
+ * - no interrupts, no traps. keep it simple
+ *
+ * Memory bus: mem_req is high in FETCH and MEM until mem_done. Bytes come
+ * back starting at mem_addr in rdata[7:0], so even misaligned loads work.
+ */
+
 `default_nettype none
 
 module cpu (
     input  wire        clk,
     input  wire        rst_n,
+
     output wire [25:0] mem_addr,
     output wire [31:0] mem_wdata,
     output wire [2:0]  mem_size,   // 1, 2 or 4 bytes
@@ -25,57 +52,69 @@ module cpu (
   localparam FIX2  = 4'd9;
 
   reg [3:0]  state;
-  reg [25:0] pc;                 // 64 MB of address space is plenty
+  reg [25:0] pc;
   reg [31:0] ir;
-  reg [31:0] a;                  // rs1
-  reg [31:0] hi;                 // rs2, then the high half of a multiply
-  reg [31:0] lo;                 // result / memory address / low half of a multiply
-  reg [31:0] yv;                 // second alu operand, already flipped if we're subtracting
-  reg        sub;                // ...and whether we are
+  reg [31:0] a;        // rs1
+  reg [31:0] hi;       // rs2, then the high half of a multiply
+  reg [31:0] lo;       // result / memory address / low half of a multiply
+  reg [31:0] yv;       // second ALU operand, already flipped if we're subtracting
+  reg        sub;      // ...and whether we are
   reg [4:0]  count;
-  reg [31:0] regs [1:15];   // x0 is always 0 so it doesnt need a register
 
+  reg [31:0] regs [1:15];
+
+  // ---------------- decode ----------------
   wire [6:0] opcode = ir[6:0];
   wire [3:0] rd     = ir[10:7];
   wire [2:0] f3     = ir[14:12];
   wire [3:0] rs1    = ir[18:15];
   wire [3:0] rs2    = ir[23:20];
+  wire [6:0] f7     = ir[31:25];
 
   wire [31:0] imm_i = {{20{ir[31]}}, ir[31:20]};
-  wire [31:0] imm_b = {{20{ir[31]}}, ir[7], ir[30:25], ir[11:8], 1'b0};
   wire [31:0] imm_s = {{20{ir[31]}}, ir[31:25], ir[11:7]};
+  wire [31:0] imm_b = {{20{ir[31]}}, ir[7], ir[30:25], ir[11:8], 1'b0};
   wire [31:0] imm_u = {ir[31:12], 12'd0};
   wire [31:0] imm_j = {{12{ir[31]}}, ir[19:12], ir[20], ir[30:21], 1'b0};
 
-  localparam OP_LUI   = 7'b0110111;
-  localparam OP_AUIPC = 7'b0010111;
-  localparam OP_JAL   = 7'b1101111;
-  localparam OP_JALR  = 7'b1100111;
+  localparam OP_LUI    = 7'b0110111;
+  localparam OP_AUIPC  = 7'b0010111;
+  localparam OP_JAL    = 7'b1101111;
+  localparam OP_JALR   = 7'b1100111;
   localparam OP_BRANCH = 7'b1100011;
-  localparam OP_LOAD  = 7'b0000011;
-  localparam OP_STORE = 7'b0100011;
-  localparam OP_IMM   = 7'b0010011;
-  localparam OP_REG   = 7'b0110011;
-
-  // the register file only has one read port: rs1 in RS1, rs2 in RS2
-  wire [3:0]  rsel = (state == RS1) ? rs1 : rs2;
-  wire [31:0] rval = (rsel == 0) ? 32'd0 : regs[rsel];
+  localparam OP_LOAD   = 7'b0000011;
+  localparam OP_STORE  = 7'b0100011;
+  localparam OP_IMM    = 7'b0010011;
+  localparam OP_REG    = 7'b0110011;
 
   wire is_reg    = (opcode == OP_REG);
   wire is_branch = (opcode == OP_BRANCH);
   wire is_store  = (opcode == OP_STORE);
-  wire is_mul    = is_reg && ir[25];
+  wire is_mul    = is_reg && (f7 == 7'b0000001);
+
+  // ---------------- register file ----------------
+  // one read port: rs1 in RS1, rs2 everywhere else
+  wire [3:0]  rsel = (state == RS1) ? rs1 : rs2;
+  wire [31:0] rval = (rsel == 0) ? 32'd0 : regs[rsel];
+
+  // one write port, always from lo
+  always @(posedge clk) begin
+    if (state == WB && rd != 0) regs[rd] <= lo;
+  end
+
+  // ---------------- ALU ----------------
+  wire [31:0] b = hi;   // rs2
 
   // second operand: rs2 for register ops and branches, otherwise an immediate.
   // this all gets worked out in RS2 and latched into yv, already inverted if
   // it's a subtract, so EXEC can start adding straight away (GF180 is slow!)
+  wire is_alu  = is_reg || (opcode == OP_IMM);
+  wire is_cmp  = is_alu && (f3 == 3'b010 || f3 == 3'b011);   // SLT, SLTU
+  wire do_sub  = is_branch || is_cmp || (is_reg && f3 == 3'b000 && ir[30]);
   wire [31:0] y_next = (is_reg || is_branch) ? rval : (is_store ? imm_s : imm_i);
 
   // one adder for everything: add, sub, compares, addresses
   // subtract = add the inverted number + 1
-  wire is_alu = is_reg || (opcode == OP_IMM);
-  wire is_cmp = is_alu && (f3 == 3'b010 || f3 == 3'b011);   // SLT, SLTU
-  wire do_sub = is_branch || is_cmp || (is_reg && f3 == 3'b000 && ir[30]);
   wire [31:0] sum;
   wire        carry;
   adder alu_add (.x(a), .y(yv), .cin(sub), .s(sum), .cout(carry));
@@ -86,31 +125,6 @@ module cpu (
   wire lt  = (a[31] == yv[31]) ? a[31] : ltu;             // signs differ -> a is less if a is negative
 
   wire [31:0] y = yv;   // for and/or/xor/shifts (never a subtract, so not inverted)
-
-  wire [31:0] b = hi;   // rs2
-
-  // one write port, always from lo
-  always @(posedge clk) begin
-    if (state == WB && rd != 0) regs[rd] <= lo;
-  end
-
-  // loads and stores
-  assign mem_addr  = (state == FETCH) ? pc : lo[25:0];
-  assign mem_req   = (state == FETCH) || (state == MEM);
-  assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
-  assign mem_we    = (state == MEM) && is_store;
-  assign mem_wdata = hi;
-
-  reg [31:0] load_val;
-  always @(*) begin
-    case (f3)
-      3'b000:  load_val = {{24{mem_rdata[7]}}, mem_rdata[7:0]};    // LB
-      3'b001:  load_val = {{16{mem_rdata[15]}}, mem_rdata[15:0]};  // LH
-      3'b100:  load_val = {24'd0, mem_rdata[7:0]};                 // LBU
-      3'b101:  load_val = {16'd0, mem_rdata[15:0]};                // LHU
-      default: load_val = mem_rdata;                               // LW
-    endcase
-  end
 
   // one shifter does all three: for a left shift, flip the bits around,
   // shift right, and flip them back
@@ -157,24 +171,6 @@ module cpu (
     endcase
   end
 
-  // multiply
-  // MUL:  hi += a if the low bit of lo is set, then shift {hi,lo} right
-  // FIX0: lo = rs2 (lo isn't needed any more for MULH*)
-  // FIX1: hi -= rs2 if rs1 was negative    (MULH, MULHSU)
-  // FIX2: lo = hi - rs1 if rs2 was negative (MULH)
-  wire        fix1_on = a[31] && (f3[1:0] == 2'b01 || f3[1:0] == 2'b10);
-  wire        fix2_on = lo[31] && (f3[1:0] == 2'b01);
-  reg  [31:0] addend;
-  always @(*) begin
-    case (state)
-      MUL:     addend = lo[0] ? a : 32'd0;
-      FIX1:    addend = fix1_on ? ~lo : 32'hffffffff;   // -rs2, or -0 (the +1 below fixes it)
-      default: addend = fix2_on ? ~a  : 32'hffffffff;   // -rs1
-    endcase
-  end
-  wire [32:0] hi_add;
-  adder mul_add (.x(hi), .y(addend), .cin(state != MUL), .s(hi_add[31:0]), .cout(hi_add[32]));
-
   // jumps, branches and auipc all share one pc adder
   wire [31:0] pc_off = (opcode == OP_JAL) ? imm_j : (is_branch ? imm_b : imm_u);
   wire [25:0] pc_imm = pc + pc_off[25:0];
@@ -194,12 +190,50 @@ module cpu (
   wire writes_rd = (opcode == OP_LUI) || (opcode == OP_AUIPC) || (opcode == OP_JAL) ||
                    (opcode == OP_JALR) || (opcode == OP_IMM) || is_reg;
 
+  // ---------------- multiply ----------------
+  // MUL:  hi += a if the low bit of lo is set, then shift {hi,lo} right
+  // FIX0: lo = rs2 (lo isn't needed any more for MULH*)
+  // FIX1: hi -= rs2 if rs1 was negative    (MULH, MULHSU)
+  // FIX2: lo = hi - rs1 if rs2 was negative (MULH)
+  wire        fix1_on = a[31] && (f3[1:0] == 2'b01 || f3[1:0] == 2'b10);
+  wire        fix2_on = lo[31] && (f3[1:0] == 2'b01);
+  reg  [31:0] addend;
+  always @(*) begin
+    case (state)
+      MUL:     addend = lo[0] ? a : 32'd0;
+      FIX1:    addend = fix1_on ? ~lo : 32'hffffffff;   // -rs2, or -0 (the +1 below fixes it)
+      default: addend = fix2_on ? ~a  : 32'hffffffff;   // -rs1
+    endcase
+  end
+  wire [32:0] hi_add;
+  adder mul_add (.x(hi), .y(addend), .cin(state != MUL), .s(hi_add[31:0]), .cout(hi_add[32]));
+
+  // ---------------- memory bus ----------------
+  assign mem_req   = (state == FETCH) || (state == MEM);
+  assign mem_addr  = (state == FETCH) ? pc : lo[25:0];
+  assign mem_size  = (state == FETCH || f3[1]) ? 3'd4 : (f3[0] ? 3'd2 : 3'd1);
+  assign mem_we    = (state == MEM) && is_store;
+  assign mem_wdata = b;
+
+  reg [31:0] load_val;
+  always @(*) begin
+    case (f3)
+      3'b000:  load_val = {{24{mem_rdata[7]}}, mem_rdata[7:0]};    // LB
+      3'b001:  load_val = {{16{mem_rdata[15]}}, mem_rdata[15:0]};  // LH
+      3'b100:  load_val = {24'd0, mem_rdata[7:0]};                 // LBU
+      3'b101:  load_val = {16'd0, mem_rdata[15:0]};                // LHU
+      default: load_val = mem_rdata;                               // LW
+    endcase
+  end
+
+  // ---------------- state machine ----------------
   always @(posedge clk) begin
     if (!rst_n) begin
       state <= FETCH;
       pc    <= 0;
     end else begin
       case (state)
+
         FETCH: if (mem_done) begin
           ir    <= mem_rdata;
           state <= RS1;
@@ -211,7 +245,7 @@ module cpu (
         end
 
         RS2: begin
-          hi  <= rval;
+          hi    <= rval;
           yv    <= do_sub ? ~y_next : y_next;
           sub   <= do_sub;
           state <= EXEC;
