@@ -2,6 +2,8 @@
 
 *a game console on one TT chip by sheheryar, hexa3*
 
+writeup on my website: [sheheryar.xyz/khatam-v](https://sheheryar.xyz/khatam-v/)
+
 ## Intro
 
 So i made Khatam-V, a game console on one Tiny Tapeout chip. It’s an RISC-V CPU, and it runs C from SPI flash. The gpu is used to draw islamic star patterns and sprites on VGA with absolutely no framebuffer. Khatam-v also has a small sound chip and run starfall. Which runs on both FPGA and simulations. The inspo for this project was my mosaic art that i used to do (and still sometimes do), along with some islamic art that ive been getting into lately. Khatam is the 8 pointed star in islamic geometry. And the screen background is made of them. I’ll likely make some more games since the design allows for that to happen. But i just wanted my first one (and the reason this chip exists) to be smth that’s part of my culture. Also it took me 2 weeks to go from VGA test stripes to a playable game :)
